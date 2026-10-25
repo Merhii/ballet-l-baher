@@ -1,0 +1,69 @@
+<title>Ballet l Ba7er</title>
+<style>
+  /* The game commits to one visual world — a glaring Mediterranean afternoon —
+     so it paints its own ground in both host themes rather than inverting. */
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: #0b3a4f;
+    overflow: hidden;
+    overscroll-behavior: none;
+    font-family: "Barlow Condensed", system-ui, -apple-system, sans-serif;
+    color: #edf6f3;
+  }
+  #webgl {
+    position: fixed; inset: 0;
+    width: 100%; height: 100%;
+    display: block;
+    touch-action: none;
+    background: #d9eef2;
+  }
+  #overlay { position: fixed; inset: 0; z-index: 20; pointer-events: none; }
+  /* An ID selector outranks the `hidden` attribute's UA display:none, so this
+     panel must opt out explicitly or it covers the game forever. */
+  #fatal[hidden] { display: none !important; }
+  #fatal {
+    position: fixed; inset: 0; z-index: 90;
+    display: grid; place-content: center;
+    gap: 10px; padding: 24px;
+    background: #0b3a4f; text-align: center;
+  }
+  #fatal h1 { font: 700 26px/1.1 "Reem Kufi", system-ui, sans-serif; margin: 0; color: #f2b733; }
+  #fatal p { max-width: 42ch; margin: 0 auto; font-size: 17px; line-height: 1.5; color: #edf6f3; }
+  @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto; } }
+</style>
+
+<canvas id="webgl"></canvas>
+<div id="overlay"></div>
+<div id="fatal" hidden>
+  <h1>بلّط البحر</h1>
+  <p>This needs WebGL, and the browser would not give it to us. Try a different browser,
+     or switch hardware acceleration back on.</p>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+__MODULES__
+</script>
+<script>
+  (function () {
+    function go() {
+      if (!window.THREE || !window.BLB_GAME) {
+        var f = document.getElementById('fatal');
+        if (f) f.hidden = false;
+        return;
+      }
+      try { window.BLB_GAME.go(); }
+      catch (err) {
+        console.error('[blb] boot failed', err);
+        var f2 = document.getElementById('fatal');
+        if (f2) {
+          f2.hidden = false;
+          f2.querySelector('p').textContent = 'The works could not open: ' + (err && err.message ? err.message : err);
+        }
+      }
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', go);
+    else go();
+  })();
+</script>
