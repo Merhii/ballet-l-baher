@@ -1,3 +1,5 @@
+<img src="brand/logo-trowel.svg" width="96" height="96" alt="">
+
 # بلّط البحر — Ballet l Ba7er
 
 **[Play it in the browser →](https://merhii.github.io/ballet-l-baher/)**
@@ -50,6 +52,14 @@ Source is four plain scripts — `physics.js` (waves, erosion, player body),
 `world.js` (all the scenery), `hud.js` (2D overlay and procedural audio) and
 `game.js` (engine and integration). `SPEC.md` is the contract they were built
 against.
+
+## Brand
+
+`brand/logo-trowel.svg` is the mark: a trowel seen from above, its blade
+scored like a balata, laid over a wave. `brand/favicon.svg` is the same mark
+cut down for small sizes — the handle knob, the grout cross and the foam line
+all disappear below about 32px, so they are dropped and the wave is thickened.
+Both are font-free, so they render anywhere.
 
 ## Credits
 

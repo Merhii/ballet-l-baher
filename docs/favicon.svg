@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 224 224" width="224" height="224" role="img" aria-label="Ballet l Ba7er">
+  <title>Ballet l Ba7er</title>
+  <!-- Small-size cut of the mark: the handle knob, the grout cross and the
+       foam line all disappear below ~32px, so they are dropped and the wave
+       is thickened to survive. -->
+  <circle cx="112" cy="112" r="108" fill="#0B3A4F"/>
+  <path d="M112 40 V70" stroke="#E4D7B3" stroke-width="16" stroke-linecap="round" fill="none"/>
+  <path d="M112 68 L172 130 C151 153, 73 153, 52 130 Z" fill="#E4D7B3"/>
+  <path d="M32 170 C58 157, 74 182, 100 171 C126 160, 140 184, 166 173 C180 167, 186 172, 194 170"
+        fill="none" stroke="#3FA8B4" stroke-width="17" stroke-linecap="round"/>
+</svg>

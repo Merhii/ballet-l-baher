@@ -45,9 +45,6 @@ if os.path.exists(THREE_SRC):
         '<script>/* three.js r128 (MIT) */\n' + three + '\n</script>')
     if 'cdnjs' in body:
         raise SystemExit('standalone build still references a CDN')
-    icon = ('data:image/svg+xml,'
-            '%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E'
-            '%3Ctext y=%22.9em%22 font-size=%2290%22%3E%F0%9F%A7%B1%3C/text%3E%3C/svg%3E')
     desc = ('Tile the Mediterranean off the Saida corniche while the sea takes '
             'your edges back. A 3D browser game of the Lebanese saying.')
     head = (
@@ -59,7 +56,8 @@ if os.path.exists(THREE_SRC):
         '<meta property="og:title" content="Ballet l Ba7er">'
         '<meta property="og:description" content="' + desc + '">'
         '<meta name="twitter:card" content="summary_large_image">'
-        '<link rel="icon" href="' + icon + '">'
+        '<link rel="icon" type="image/svg+xml" href="favicon.svg">'
+        '<link rel="mask-icon" href="favicon.svg" color="#0b3a4f">'
         + HEAD_RESET)
     page = ('<!doctype html><html lang="en"><head>' + head + '</head><body>'
             + body + '</body></html>')
@@ -72,6 +70,11 @@ if os.path.exists(THREE_SRC):
         os.makedirs('docs')
     io.open('docs/index.html', 'w', encoding='utf-8').write(page)
     io.open('docs/.nojekyll', 'w', encoding='utf-8').write('')
+    for name in ('favicon.svg', 'logo-trowel.svg'):
+        src = os.path.join('brand', name)
+        if os.path.exists(src):
+            io.open(os.path.join('docs', name), 'w', encoding='utf-8').write(
+                io.open(src, encoding='utf-8').read())
     print('standalone/index.html + docs/index.html %.1f KB'
           ' (three.js inlined; fonts still from Google)' % (len(page) / 1024.0))
 else:
