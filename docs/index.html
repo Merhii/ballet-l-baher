@@ -6232,7 +6232,8 @@
      flatShading derives normals in the fragment shader, so there is no
      per-frame computeVertexNormals — that is what makes this affordable. */
   function createSea(scene, waves) {
-    var SIZE = 720, SEG = 144, STEP = SIZE / SEG;   // 5m snap, integer
+    // 144 -> 20.9k vertices displaced per frame; 90 -> 8.3k. Phones get 90.
+    var SIZE = 720, SEG = IS_TOUCH ? 90 : 144, STEP = SIZE / SEG;
     var geo = new THREE.PlaneGeometry(SIZE, SIZE, SEG, SEG);
     geo.rotateX(-Math.PI / 2);
     var pos = geo.attributes.position, N = pos.count;
@@ -6370,13 +6371,19 @@
   }
 
   // ================================================================ boot
+  // Phones: no pointer lock, a lighter render tier, and on-screen controls.
+  var IS_TOUCH = (typeof window !== 'undefined') &&
+    ((('ontouchstart' in window) || (navigator.maxTouchPoints || 0) > 0) ||
+     /[?&]touch\b/.test(window.location.search));   // ?touch forces the mobile tier
+
   function boot(saved) {
     var canvas = document.getElementById('webgl');
     var overlay = document.getElementById('overlay');
 
     // ---- renderer / scene / lights
     var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, powerPreference: 'high-performance' });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
+    // a phone GPU does not want a 2x buffer on a full-screen WebGL scene
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, IS_TOUCH ? 1.2 : 1.75));
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.outputEncoding = THREE.sRGBEncoding;
     /* The scenery's light rig peaks near 2.0 combined intensity, which rails
@@ -6512,13 +6519,14 @@
       document.body.appendChild(hint);
     })();
     function updateHint() {
-      var show = S.started && firstPerson && !fp.locked;
+      var show = !IS_TOUCH && S.started && firstPerson && !fp.locked;
       hint.textContent = fp.giveUp ? 'drag to look around' : 'click to look around';
       hint.classList.toggle('on', show);
       canvas.style.cursor = (firstPerson && fp.locked) ? 'none' : '';
     }
 
     function requestLook() {
+      if (IS_TOUCH) { fp.giveUp = true; return; }   // nothing to capture on a phone
       if (!firstPerson || fp.locked) return;
       if (!canvas.requestPointerLock) { fp.giveUp = true; updateHint(); return; }
       try { canvas.requestPointerLock(); } catch (err) { fp.failures++; }
@@ -6651,15 +6659,18 @@
 
     // ---- touch: left thumb walks, right thumb looks, buttons do the work
     var touch = { moveX: 0, moveZ: 0, lookId: -1, moveId: -1, ox: 0, oy: 0 };
-    if ('ontouchstart' in window || (navigator.maxTouchPoints || 0) > 0) buildTouchControls();
+    var tTalk = null;
+    if (IS_TOUCH) buildTouchControls();
     function buildTouchControls() {
       var wrap = document.createElement('div');
       wrap.id = 'touchlayer';
       wrap.innerHTML =
         '<div id="tstick"><div id="tnub"></div></div>' +
-        '<div id="tbtns"><button id="tlay" type="button">بلّط</button>' +
+        '<div id="tbtns"><button id="ttalk" type="button">TALK</button>' +
+        '<button id="tlay" type="button">بلّط</button>' +
         '<button id="tdig" type="button">SHOVEL</button>' +
-        '<button id="tjump" type="button">JUMP</button></div>';
+        '<button id="tjump" type="button">JUMP</button></div>' +
+        '<div id="trotate"><b>turn your phone</b><span>this one wants landscape</span></div>';
       var st = document.createElement('style');
       st.textContent =
         '#touchlayer{position:fixed;inset:0;z-index:40;pointer-events:none;font-family:"Barlow Condensed",system-ui,sans-serif}' +
@@ -6667,7 +6678,16 @@
         '#tnub{position:absolute;left:50%;top:50%;width:54px;height:54px;margin:-27px 0 0 -27px;border-radius:50%;background:rgba(242,179,51,.85)}' +
         '#tbtns{position:absolute;right:calc(18px + env(safe-area-inset-right,0px));bottom:calc(26px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:10px;pointer-events:auto}' +
         '#tbtns button{font:700 19px/1 "Barlow Condensed",system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#0b3a4f;background:#f2b733;border:3px solid #0b3a4f;border-radius:4px;padding:15px 20px;touch-action:none}' +
-        '#tlay{font-family:"Reem Kufi",system-ui,sans-serif!important;font-size:23px!important;background:#edf6f3!important}';
+        '#tlay{font-family:"Reem Kufi",system-ui,sans-serif!important;font-size:23px!important;background:#edf6f3!important}' +
+        '#ttalk{display:none;background:#3fa8b4!important;color:#0b3a4f!important}' +
+        '#tbtns button:active{transform:translateY(2px)}' +
+        // a phone held upright gets almost no horizon; ask once, politely
+        '#trotate{position:fixed;inset:0;z-index:60;display:none;pointer-events:auto;' +
+        'flex-direction:column;align-items:center;justify-content:center;gap:8px;' +
+        'background:#0b3a4f;color:#edf6f3;text-align:center;padding:24px}' +
+        '#trotate b{font:700 22px/1.1 "Reem Kufi",system-ui,sans-serif;letter-spacing:.04em}' +
+        '#trotate span{font-size:14px;letter-spacing:.14em;text-transform:uppercase;opacity:.75}' +
+        '@media (orientation:portrait){#trotate{display:flex}}';
       document.head.appendChild(st);
       document.body.appendChild(wrap);
       var stick = wrap.querySelector('#tstick'), nub = wrap.querySelector('#tnub');
@@ -6688,16 +6708,14 @@
       }
       stick.addEventListener('pointerup', endStick);
       stick.addEventListener('pointercancel', endStick);
-      // right half of the screen drags the camera
-      canvas.addEventListener('touchmove', function (e) {
-        var t0 = e.touches[0];
-        if (!t0 || t0.clientX < window.innerWidth * 0.42) return;
-        if (touch.lookId === -1) { touch.lookId = t0.identifier; lastPX = t0.clientX; lastPY = t0.clientY; return; }
-        cam.yaw -= (t0.clientX - lastPX) * 0.007;
-        cam.pitch = clamp(cam.pitch + (t0.clientY - lastPY) * 0.005, 0.07, 1.22);
-        lastPX = t0.clientX; lastPY = t0.clientY;
-      }, { passive: true });
-      canvas.addEventListener('touchend', function () { touch.lookId = -1; }, { passive: true });
+      /* Looking is handled by the canvas pointer events, which already cover
+         touch. The old touchmove listener here doubled every drag. */
+      tTalk = wrap.querySelector('#ttalk');
+      tTalk.addEventListener('pointerdown', function (e) {
+        e.preventDefault();
+        var near = nearestNPC();
+        if (near) talkTo(near.npc);
+      });
       var lay = wrap.querySelector('#tlay'), dig = wrap.querySelector('#tdig');
       lay.addEventListener('pointerdown', function () { sfx.unlock(); placing = true; });
       lay.addEventListener('pointerup', function () { placing = false; });
@@ -6770,8 +6788,10 @@
       var pile = nearestPile();
       var who = nearestNPC();
       // whoever is closer wins the E key
+      if (tTalk) tTalk.style.display = who ? 'block' : 'none';
       if (who && (!pile || who.dist < 2.6)) {
-        hud.setPrompt('E — talk to ' + who.npc.def.name);
+        hud.setPrompt(IS_TOUCH ? 'talk to ' + who.npc.def.name
+                               : 'E — talk to ' + who.npc.def.name);
       } else if (pile && keys.KeyE) {
         if (S.mortar >= S.mortarMax) {
           hud.setPrompt('barrow full — go tile the sea');
@@ -6787,7 +6807,7 @@
           pushStats();
         }
       } else if (pile) {
-        hud.setPrompt('hold E — shovel mouna');
+        hud.setPrompt(IS_TOUCH ? 'hold SHOVEL for mouna' : 'hold E — shovel mouna');
       } else if (S.mortar < 1) {
         hud.setPrompt('out of mouna — back to the piles on the corniche');
       } else {
@@ -7171,7 +7191,9 @@
       S.started = true;
       sfx.unlock();
       hud.hideIntro();
-      hud.toast('Click to capture the mouse. Hold E at a pile for mouna.', 'info');
+      hud.toast(IS_TOUCH
+        ? 'Drag to look. Hold SHOVEL at a pile, then tap بلّط.'
+        : 'Click to capture the mouse. Hold E at a pile for mouna.', 'info');
       updateHint();
       setTimeout(heckle, 6500);
     }
