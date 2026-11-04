@@ -44,21 +44,21 @@
   const HECKLES = [
     'shu 3am ta3mel ya 3ammi?',
     'khalas, rou2 3a 7alak.',
-    'the sea was here before you.',
-    'my cousin tried this. he sells kaak now.',
+    'el ba7er kén hon 2abel bayyi.',
+    'ibn khalte jarrab. halla2 bibi3 ka3ke.',
     'yi, 7aram el mouna.',
-    'ya3ni the sea asked for tiles?',
+    'ya3ni el ba7er talab balat?',
     'ba3ref shater, bass el ba7er a3raf.',
-    'go home, your mother made mjadra.',
-    'the municipality knows about this?',
-    'put one for me, there, at the corner.',
-    'in winter you will cry, ya muallim.',
-    'at least the grout is straight. mabrouk.',
-    'wallah you did not stop. respect.',
-    'ok. ok. now I am a little impressed.',
-    'bring me a coffee and I will hold the level.',
-    'the fish are complaining to the mokhtar.',
-    'yalla, one more row and I go eat.'
+    'rou7 3a el bét, immak 3emlet mjaddara.',
+    'el baladiyye b3erfe b hal shaghle?',
+    'hott wa7de 3anne, hon, 3and el zawiye.',
+    'b el shite rah tebke ya m3allem.',
+    '3a el a2all el fawasel mestawye. mabrouk.',
+    'wallah ma w2eft. ya3tik el 3afye.',
+    'tayyeb. tayyeb. sart tfout b 3a2le shwayy.',
+    'jiblé 2ahwe w bemsek el mizan.',
+    'el samak 3am yeshteke 3and el mokhtar.',
+    'yalla, saff kamén w rayé7 ekol.'
   ];
 
   /* ---------------------------------------------------------------- helpers */
@@ -305,6 +305,22 @@
 '.blb-heckle.out{opacity:0;transition:opacity .4s;}',
 '@keyframes blb-pop{from{opacity:0;transform:rotate(-5deg) scale(.9) translateY(8px);}',
 '  to{opacity:1;transform:rotate(-.8deg) scale(1) translateY(0);}}',
+
+/* --- stamina ------------------------------------------------------------- */
+'.blb-hp{padding:7px 9px 8px;}',
+'.blb-hp .top{display:flex;align-items:baseline;justify-content:space-between;gap:8px;}',
+'.blb-hp .k{font-size:9.5px;font-weight:600;letter-spacing:.11em;text-transform:uppercase;',
+'  color:var(--blb-ink);opacity:.72;}',
+'.blb-hp .ar{font-family:var(--blb-kufi);font-size:11px;opacity:.6;}',
+'.blb-hp .track{position:relative;height:13px;margin-top:5px;border:2px solid var(--blb-ink);',
+'  background:rgba(11,58,79,.10);overflow:hidden;}',
+'.blb-hp .fill{position:absolute;inset:0;width:100%;transform-origin:left center;',
+'  background:var(--blb-ss);transition:transform .18s linear,background-color .3s;}',
+'.blb-hp.low .fill{background:var(--blb-haz);}',
+'.blb-hp.out .fill{background:var(--blb-rust);}',
+'.blb-hp .pips{position:absolute;inset:0;display:flex;}',
+'.blb-hp .pips i{flex:1 1 0;border-right:2px solid rgba(228,215,179,.55);}',
+'.blb-hp .pips i:last-child{border-right:0;}',
 
 /* --- NPC speech, anchored to a projected world position ------------------ */
 '.blb-saylayer{position:absolute;inset:0;overflow:hidden;pointer-events:none;}',
@@ -666,6 +682,8 @@
     const shown = { metres: 0, lira: 0, tiles: 0, mortar: 0 }; // eased display values
     let muted = false, phase = 'day', clock = 0, lastFrame = 0, frames = 0;
     let shopOpen = false, introOpen = false, loadPct = null;
+    S.health = S.health == null ? 100 : S.health;
+    S.healthMax = S.healthMax == null ? 100 : S.healthMax;
     let shake = 0;
 
     const reduced = (function () {
@@ -723,6 +741,16 @@
     const elMm = barrow.querySelector('[data-mm]');
     stats.appendChild(barrow);
 
+    // stamina — the thing knefe buys back
+    const hp = el('div', 'blb-plaque blb-hp');
+    hp.innerHTML =
+      '<div class="top"><span class="k">Stamina</span>' +
+        '<span class="ar blb-ar">النفس</span></div>' +
+      '<div class="track"><div class="fill" data-hpfill></div>' +
+        '<div class="pips"><i></i><i></i><i></i><i></i></div></div>';
+    const elHpFill = hp.querySelector('[data-hpfill]');
+    stats.appendChild(hp);
+
     // tiles / lira / shabeb
     const row = el('div', 'blb-row');
     row.innerHTML =
@@ -735,10 +763,7 @@
     const elTiles = row.querySelector('[data-tiles]');
     const elLira = row.querySelector('[data-lira]');
     const elWorkers = row.querySelector('[data-workers]');
-    if (simple) {
-      elLira.parentNode.style.display = 'none';
-      elWorkers.parentNode.style.display = 'none';
-    }
+    if (simple) elWorkers.parentNode.style.display = 'none';
     stats.appendChild(row);
 
     // sea state
@@ -1082,6 +1107,14 @@
       if (s.lira != null) S.lira = num(s.lira, S.lira);
       if (s.workers != null) S.workers = num(s.workers, S.workers);
       if (s.swell != null) S.swell = clamp(num(s.swell, S.swell), 0, 1);
+      if (s.healthMax != null) S.healthMax = Math.max(1, num(s.healthMax, S.healthMax));
+      if (s.health != null) {
+        S.health = clamp(num(s.health, S.health), 0, S.healthMax);
+        const frac = S.health / S.healthMax;
+        elHpFill.style.transform = 'scaleX(' + frac.toFixed(3) + ')';
+        hp.classList.toggle('low', frac <= 0.25 && frac > 0);
+        hp.classList.toggle('out', frac <= 0);
+      }
       if (s.unlocked != null) S.unlocked = normUnlocked(s.unlocked, tiers.length);
       if (s.tierIdx != null) S.tierIdx = clamp(num(s.tierIdx, S.tierIdx) | 0, 0, tiers.length - 1);
 

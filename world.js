@@ -87,6 +87,58 @@
     return t;
   }
 
+  /* 0. painted shop sign. Arabic is drawn with fillText so the browser does
+        the shaping; TextGeometry would need a font file we do not ship.      */
+  function texShopSign(o) {
+    // Power-of-two, so nothing downsamples it behind our back and squashes
+    // the glyphs into blocks.
+    const w = o.w || 1024, h = o.h || 256;
+    const c = cv(w, h), g = c.getContext('2d');
+
+    function draw() {
+      g.clearRect(0, 0, w, h);
+      g.fillStyle = o.bg || '#0B3A4F';
+      g.fillRect(0, 0, w, h);
+      g.strokeStyle = o.border || 'rgba(242,183,51,0.75)';
+      g.lineWidth = Math.round(h * 0.035);
+      g.strokeRect(g.lineWidth, g.lineWidth, w - g.lineWidth * 2, h - g.lineWidth * 2);
+      g.textAlign = 'center';
+      g.textBaseline = 'middle';
+      g.fillStyle = o.fg || '#F2B733';
+      // Arabic: let the browser shape it. The stack ends at a generic family
+      // so a machine without any of the named faces still gets real glyphs.
+      g.font = '700 ' + Math.round(h * (o.size || 0.34)) +
+        'px "Reem Kufi","Noto Naskh Arabic","Geeza Pro","Al Bayan","Segoe UI",sans-serif';
+      g.fillText(o.ar || '', w / 2, h * (o.sub ? 0.40 : 0.5));
+      if (o.sub) {
+        g.font = '600 ' + Math.round(h * 0.12) +
+          'px "Barlow Condensed",system-ui,-apple-system,sans-serif';
+        g.globalAlpha = 0.9;
+        g.fillText(o.sub, w / 2, h * 0.74);
+        g.globalAlpha = 1;
+      }
+      const grd = g.createLinearGradient(0, 0, 0, h);
+      grd.addColorStop(0, 'rgba(255,255,255,0.10)');
+      grd.addColorStop(1, 'rgba(0,0,0,0.12)');
+      g.fillStyle = grd;
+      g.fillRect(0, 0, w, h);
+    }
+
+    draw();
+    const t = finish(c);
+    t.wrapS = t.wrapT = T.ClampToEdgeWrapping;
+    /* Webfonts land after the world is built, so repaint once they are in and
+       push the texture again — otherwise the sign keeps whatever fallback was
+       available at build time. */
+    if (typeof document !== 'undefined' && document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(function () {
+        draw();
+        t.needsUpdate = true;
+      }).catch(function () { /* no font API: the first paint stands */ });
+    }
+    return t;
+  }
+
   /* 1. grain: flat base + soft blotches + speckle. plaster / cement / sand   */
   function texGrain(o) {
     const S = o.size || 128, c = cv(S, S), g = c.getContext('2d'), rng = mulberry(o.seed || 7);
@@ -227,7 +279,8 @@
     g.fillStyle = gr; g.fillRect(0, 0, S, S);
     return finish(c);
   }
-  /* blocky faux-lettering for the municipal sign (glyph bars, never real text) */
+  /* blocky faux-lettering for the municipal sign (glyph bars, never real
+     text). Not to be confused with texShopSign above, which draws REAL text. */
   function texSign() {
     const W = 256, H = 128, c = cv(W, H), g = c.getContext('2d'), rng = mulberry(42);
     g.fillStyle = '#2b5e8c'; g.fillRect(0, 0, W, H);
@@ -1404,6 +1457,87 @@
      honest municipal clutter: chairs, dumpster, bollard litter, sandbags,
      rebar stubs out of unfinished concrete.
      ========================================================================= */
+  /* =========================================================================
+     KNEFE JARDALI — كنافة جردلي.  A sweet shop on the corniche: painted
+     booth, copper tray of knefe under glass, striped awning, and a sign the
+     player can actually read. Health comes out of this building.
+     ========================================================================= */
+  function buildKnefe() {
+    const C0 = W.COL, rng = mulberry(6120), c = new T.Color();
+    const m = new Mesher(), mf = new Mesher();
+    const g = new T.Group();
+    const KX = -24, KZ = -12.4, FLOOR = 1.5;
+
+    // plinth
+    m.box(vary(C0.CEMENT, rng, 0.07, c), KX, FLOOR + 0.07, KZ, 6.2, 0.16, 4.4, 0, 0, 0, 1 / 6);
+
+    // three painted walls, open toward the sea
+    const wall = mixc(C0.LIMESTONE, C0.TERRACOTTA, 0.18, new T.Color());
+    const plinthBand = mixc(C0.TERRACOTTA, C0.RUST, 0.35, new T.Color());
+    for (let y = FLOOR + 0.15; y < FLOOR + 3.3; y += 0.5) {
+      const h = Math.min(0.5, FLOOR + 3.3 - y);
+      const parts = [[0, -2.0, 5.8, 0.4], [-2.7, 0, 0.4, 4.0], [2.7, 0, 0.4, 4.0]];
+      for (let s2 = 0; s2 < 3; s2++) {
+        const b = parts[s2];
+        vary(y < FLOOR + 0.9 ? plinthBand : wall, rng, 0.08, c);
+        m.box(c, KX + b[0], y + h * 0.5, KZ + b[1], b[2], h * 1.02, b[3], 0, 0, 0, 1 / 5);
+      }
+    }
+
+    // counter: stone top, with a glass case on it
+    m.box(vary(C0.LIMESTONE, rng, 0.06, c), KX, FLOOR + 1.02, KZ + 1.85, 5.8, 0.18, 0.95, 0, 0, 0, 1 / 5);
+    m.box(mixc(C0.CEMENT, C0.STONE_DARK, 0.3, c), KX, FLOOR + 0.5, KZ + 1.95, 5.6, 0.9, 0.7, 0, 0, 0, 1 / 6);
+
+    // the knefe itself: a copper siniyye, one wedge already gone
+    const copper = mixc(C0.RUST, C0.SUN, 0.42, new T.Color());
+    const knefeTop = mixc(C0.TERRACOTTA, C0.SUN, 0.55, new T.Color());
+    mf.prim(PRIM.cyl12, copper, KX - 1.5, FLOOR + 1.17, KZ + 1.8, 2.0, 0.14, 2.0);
+    mf.prim(PRIM.cyl12, knefeTop, KX - 1.5, FLOOR + 1.26, KZ + 1.8, 1.82, 0.1, 1.82);
+    // the missing slice, and the slice on a plate beside it
+    mf.box(mixc(copper, C0.STONE_DARK, 0.4, c), KX - 0.95, FLOOR + 1.25, KZ + 2.25, 0.8, 0.1, 0.8, 0, 0.6, 0);
+    mf.prim(PRIM.cyl12, mixc(C0.FOAM, C0.CEMENT, 0.12, c), KX + 1.1, FLOOR + 1.15, KZ + 1.75, 0.8, 0.07, 0.8);
+    mf.box(knefeTop, KX + 1.1, FLOOR + 1.23, KZ + 1.75, 0.5, 0.12, 0.42, 0, 0.5, 0);
+    // stack of plates, syrup jug
+    for (let i = 0; i < 5; i++) {
+      mf.prim(PRIM.cyl12, mixc(C0.FOAM, C0.CEMENT, 0.1, c), KX + 2.1, FLOOR + 1.14 + i * 0.05, KZ + 1.75, 0.72, 0.05, 0.72);
+    }
+    mf.prim(PRIM.cyl8, mixc(C0.STONE_DARK, C0.SUN, 0.3, c), KX - 2.5, FLOOR + 1.3, KZ + 1.8, 0.42, 0.42, 0.42);
+
+    // striped awning over the counter
+    for (let i = 0; i < 9; i++) {
+      const col = i % 2 ? mixc(C0.FOAM, C0.LIMESTONE, 0.2, c) : mixc(C0.TERRACOTTA, C0.RUST, 0.2, c);
+      mf.box(col.clone(), KX - 2.8 + i * 0.7, FLOOR + 3.0, KZ + 2.5, 0.7, 0.1, 1.5, -0.22, 0, 0);
+    }
+    mf.box(mixc(C0.CEMENT, C0.STONE_DARK, 0.4, c), KX, FLOOR + 3.22, KZ + 1.9, 6.0, 0.12, 0.12);
+
+    // two plastic stools, because there always are
+    for (let i = 0; i < 2; i++) {
+      const sx = KX + (i ? 2.2 : -2.0), sz = KZ + 3.4 + (i ? 0.3 : 0);
+      mf.prim(PRIM.cyl8, mixc(C0.SEA_SHALLOW, C0.FOAM, 0.25, c), sx, FLOOR + 0.45, sz, 0.8, 0.9, 0.8, 0, rng() * 3, 0);
+      mf.prim(PRIM.cyl12, mixc(C0.SEA_SHALLOW, C0.FOAM, 0.35, c), sx, FLOOR + 0.92, sz, 1.0, 0.08, 1.0);
+    }
+
+    g.add(bake(m, W.MAT.plaster, 'knefeShell'));
+    g.add(bake(mf, W.MAT.flat, 'knefeFittings'));
+
+    /* the sign. MeshBasic so it stays readable after dark, like a real one. */
+    const signMat = new T.MeshBasicMaterial({
+      map: texShopSign({ w: 1024, h: 256, ar: 'كنافة جردلي', sub: 'SINCE 1948',
+                     bg: '#0B3A4F', fg: '#F2B733', border: 'rgba(242,183,51,0.75)' })
+    });
+    W.mats.push(signMat);
+    const signGeo = new T.PlaneGeometry(5.4, 1.52);
+    W.geos.push(signGeo);
+    const sign = new T.Mesh(signGeo, signMat);
+    sign.name = 'knefeSign';
+    sign.position.set(KX, FLOOR + 2.55, KZ + 2.56);
+    g.add(sign);
+
+    coll(KX - 3.1, KZ - 2.3, KX + 3.1, KZ + 1.6, FLOOR + 3.3);
+    g.name = 'knefe';
+    return { group: g, at: { x: KX, y: FLOOR, z: KZ + 3.0 } };
+  }
+
   function buildKioskAndCart() {
     const C0 = W.COL, rng = mulberry(7700), c = new T.Color();
     const m = new Mesher(), mg = new Mesher();
@@ -2300,6 +2434,8 @@
     buildTrees();
     buildStreetFurniture();
     const kiosk = buildKioskAndCart();
+    const knefe = buildKnefe();
+    group.add(knefe.group);
     buildClutter();
     const sandPiles = buildSandPiles();
     buildFisherman();
@@ -2527,6 +2663,7 @@
       landColliders: W.coll,
       sandPiles: sandPiles,
       kiosk: kiosk,
+      knefe: knefe.at,
       heckler: { x: -11.0, y: 1.5, z: -3.6 },     // worn patch by the missing railing
       dispose: dispose,
       /* ---- extras the game may use ---- */

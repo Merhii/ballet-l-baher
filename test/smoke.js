@@ -362,8 +362,8 @@ check('HUD speech layer (NPC bubbles)', () => {
   if (!(ttl > 0)) throw new Error('say() returned no lifetime: ' + ttl);
   if (!hud.isSaying('abou')) throw new Error('isSaying false right after say()');
   hud.anchorSpeech('abou', 640, 300, true);
-  hud.say('imkhalil', { name: 'Im Khalil', text: '3mol mneeh w kob bl ba7er.', ar: 'إعمل منيح وكبّ بالبحر' });
-  if (!hud.isSaying('imkhalil')) throw new Error('second speaker not tracked');
+  hud.say('imkamel', { name: 'Im Kamel', text: '3mol mneeh w kob bl ba7er.', ar: 'إعمل منيح وكبّ بالبحر' });
+  if (!hud.isSaying('imkamel')) throw new Error('second speaker not tracked');
   // the bubble must expire on its own
   for (let i = 0; i < 1200; i++) hud.frame(0.016);
   if (hud.isSaying('abou')) throw new Error('bubble never expired');

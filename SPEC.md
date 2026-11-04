@@ -84,7 +84,7 @@ currency, no hired workers.
 
 Mouna is shovelled from any pile on the deck (hold E); the barrow holds 20.
 `E` next to a character talks to them instead — each has an ordered
-conversation that wraps, and Im Khalil hands you mouna on some of her lines.
+conversation that wraps, and Im Kamel hands you mouna on some of her lines.
 
 ## Module contracts
 

@@ -31,6 +31,18 @@
              color: '#' + ('000000' + t.color.toString(16)).slice(-6) };
   });
   var MORTAR_MAX = 20;
+  /* Health is stamina, not hit points: laying balat and swimming in November
+     wear you down, and knefe at Jardali's is how you get it back. */
+  var HEALTH_MAX = 100;
+  var DRAIN_IDLE = 0.42;      // per second, just standing in the sun
+  var DRAIN_RUN = 0.75;
+  var DRAIN_DIG = 1.05;
+  var DRAIN_WATER = 2.30;
+  var SOAK_HIT = 7;           // one-off, the moment the sea gets you
+  var KNEFE_PRICE = 25;
+  var KNEFE_HEAL = 45;
+  var PAY_PER_BALATA = 3;     // the more you tile, the more you make
+  var PAY_PER_SURVIVING = 1;  // and the inspection pays rent on what holds
 
   var CELL = 2.0, TILE_TOP = 0.30, DECK_Y = 1.5;
   var REACH = 11.5;            // how far the muallim can lean out to lay a balata
@@ -449,6 +461,7 @@
     // ---- state
     var S = {
       mortar: 6, mortarMax: MORTAR_MAX,
+      health: HEALTH_MAX, lira: 0, knefeEaten: 0,
       elapsed: 0, started: false, laid: 0, lost: 0,
       nextInspection: INSPECTION_EVERY, nextHeckle: 24, squall: false, phase: '',
       wasInWater: false
@@ -748,6 +761,7 @@
       if (sim.get(i, j)) return 'already tiled';
       if (!sim.isSupported(i, j)) return 'nothing to rest it on';
       if (S.mortar < TIERS[tierIdx].mortar) return 'no mouna left';
+      if (S.health <= 0) return 'too weak — knefe at Jardali';
       if (checkReach) {
         var dx = cellCentreX(i) - body.pos.x, dz = cellCentreZ(j) - body.pos.z;
         if (dx * dx + dz * dz > REACH * REACH) return 'too far — walk out';
@@ -770,6 +784,7 @@
       if (!sim.place(cellTmp.i, cellTmp.j, 0, now)) return;
       lastPlace = now;
       S.mortar -= TIERS[0].mortar;
+      S.lira += PAY_PER_BALATA;
       S.laid++;
       tiles.add(cellTmp.i, cellTmp.j, 0);
       sfx.clack();
@@ -786,7 +801,7 @@
     }
 
     // ---------------------------------------------------------- gathering
-    var digTimer = 0;
+    var digTimer = 0, digging = false;
     function nearestPile() {
       var best = null, bd = 9;
       var piles = world.sandPiles || [];
@@ -799,18 +814,22 @@
       return best;
     }
     function updateGathering(dt) {
+      digging = false;
       var pile = nearestPile();
       var who = nearestNPC();
       // whoever is closer wins the E key
       if (tTalk) tTalk.style.display = who ? 'block' : 'none';
       if (who && (!pile || who.dist < 2.6)) {
-        hud.setPrompt(IS_TOUCH ? 'talk to ' + who.npc.def.name
-                               : 'E — talk to ' + who.npc.def.name);
+        var label = who.npc.def.sells === 'knefe'
+          ? 'knefe · ' + KNEFE_PRICE + ' l.l.'
+          : 'talk to ' + who.npc.def.name;
+        hud.setPrompt(IS_TOUCH ? label : 'E — ' + label);
       } else if (pile && keys.KeyE) {
         if (S.mortar >= S.mortarMax) {
           hud.setPrompt('barrow full — go tile the sea');
         } else {
           S.mortar = Math.min(S.mortarMax, S.mortar + dt * 7.5);
+          digging = true;
           digTimer -= dt;
           if (digTimer <= 0) {
             digTimer = 0.34;
@@ -839,85 +858,120 @@
         shirt: 0xe8e2d4, hatCol: 0x6b7278, yaw: 0,
         at: function (w) { return w.heckler || { x: -11, y: DECK_Y, z: -3.6 }; },
         talk: [
-          'You again. Shu, the sea said yes?',
-          'I have sat on this railing since before you were born.',
-          'My father said this exact thing to a man with a wheelbarrow. 1974.',
-          'Fine. It is a straight line. I said nothing.',
-          'Ya3ni… if you ever need a second barrow, I know a guy.'
+          { t: 'Rje3t? Ya3ni ma fi shi a7san ta3melo?', ar: 'رجعت؟' },
+          { t: 'Ana 2a3ed 3a hal darabzin min 2abel ma tkhla2.', ar: 'قبل ما تخلق' },
+          { t: 'Bayyi 7aka hal 7aki la wa7ad b 3arabaye. Sent 74.', ar: 'سنة ٧٤' },
+          { t: 'Tayyeb. Khatt mestawi. Ma 2elet shi.', ar: 'ما قلت شي' },
+          { t: 'Iza badak tente 3arabaye, ba3ref wa7ad.', ar: 'بعرف واحد' }
         ],
         lines: {
-          greet: ['Ahla. You came back.', 'Yi. El muhandis.'],
+          greet: [{ t: 'Ahla. Rje3t.', ar: 'أهلا' }, { t: 'Yi. El mhandes.', ar: 'يي، المهندس' }],
           idle: [
-            'Shu oshbak ya 3mi?',
-            'Khalas, rou2 3a 7alak.',
-            'The sea was here before me. Before my father.',
-            'Ya3ni the sea asked for tiles?',
-            'Go get a government job.',
-            'Every wave is a letter. It says: no.'
+            { t: 'Shu 3am ta3mel ya 3ammi?', ar: 'شو عم تعمل يا عمي؟' },
+            { t: 'Khalas. Rou2 3a 7alak.', ar: 'خلص، روق ع حالك' },
+            { t: 'El ba7er kén hon 2abel bayyi.', ar: 'البحر كان هون قبل بيي' },
+            { t: 'Ya3ni el ba7er talab balat?', ar: 'البحر طلب بلاط؟' },
+            { t: 'Dabber 7alak b wazife.', ar: 'دبّر حالك بوظيفة' },
+            { t: 'Kell moje betkoul: la2.', ar: 'كل موجة بتقول لأ' }
           ],
-          firstTile: ['One balata. Congratulations. Only the whole sea left.'],
+          firstTile: [{ t: 'Balata wa7de. Mabrouk. Badyé el ba7er kello.', ar: 'بلاطة وحدة' }],
           lost: [
-            'I told you. The sea does not give receipts.',
-            'Ya haram. All that mouna.'
+            { t: '2eltellak. El ba7er ma bya3ti wusoulat.', ar: 'ما بيعطي وصولات' },
+            { t: 'Ya 7aram el mouna.', ar: 'يا حرام المونة' }
           ],
-          milestone: ['{n} balata. Ok. I saw nothing.', 'Hm. You are still here.'],
-          night: ['Go home. Even the sea sleeps.'],
-          swim: ['Ya3ni. Now you are swimming with it.']
+          milestone: [{ t: '{n} balata. Tayyeb. Ma shefet shi.', ar: 'ما شفت شي' }],
+          night: [{ t: 'Rou7 3a el bét. 7atta el ba7er bineym.', ar: 'روح ع البيت' }],
+          swim: [{ t: 'Ha. Halla2 3am tesba7 ma3o.', ar: 'عم تسبح معه' }],
+          spent: [{ t: 'Shefet? El ba7er ma bite3ab. Inta bti3ab.', ar: 'البحر ما بيتعب' }]
         }
       },
       {
-        id: 'imkhalil', name: 'Im Khalil', voice: 3, hat: 'scarf', scale: 0.96,
+        id: 'imkamel', name: 'Im Kamel', voice: 3, hat: 'scarf', scale: 0.96,
         shirt: 0x9c5f7a, hatCol: 0xb9502f, yaw: Math.PI * 0.85,
         at: function (w) {
           var c = w.cart && w.cart.position;
           return c ? { x: c.x - 1.6, y: DECK_Y, z: c.z + 1.1 } : { x: 20, y: DECK_Y, z: -8 };
         },
         talk: [
-          'Khod, kol. You cannot tile on an empty stomach.',
-          { t: '3mol mneeh w kob bl ba7er. My mother said it every morning.', ar: 'إعمل منيح وكبّ بالبحر' },
-          'She also said: and do not come home wet.',
-          'Take some mouna. I will not tell the muallim.',
-          'You remind me of my son. He also does useless things beautifully.'
+          { t: 'Khod, kol. Ma btballet w inta ja3an.', ar: 'خود كول' },
+          { t: '3mol mneeh w kob bl ba7er. Immi kénet et2oula kell yom.', ar: 'إعمل منيح وكبّ بالبحر' },
+          { t: 'W kénet et2oul kamén: w ma terja3 mballal.', ar: 'ما ترجع مبلّل' },
+          { t: 'Khod mouna. Ma b2oul lal m3allem.', ar: 'ما بقول للمعلّم' },
+          { t: 'Bet zakkerni b ibni. Huwwe kamén bi3mol shaghlat bala ma3na.', ar: 'بتذكّرني بابني' }
         ],
         givesAt: [0, 3],
         lines: {
-          greet: ['Khod kaake. 3a 7sabe.', 'Ahla w sahla, ya 3ammi.'],
+          greet: [{ t: 'Ahla w sahla ya 3ammi.', ar: 'أهلا وسهلا' }],
           idle: [
-            { t: '3mol mneeh w kob bl ba7er.', ar: 'إعمل منيح وكبّ بالبحر' },
-            'Kol shi bi waqto 7elo.',
-            'My husband also built something pointless. Me.',
-            'Shrab shay, ba3dein ballet.'
+            { t: 'Kell shi b wa2to 7elo.', ar: 'كل شي بوقته حلو' },
+            { t: 'Alla ya3tik el 3afye.', ar: 'الله يعطيك العافية' },
+            { t: 'Shrab shay, ba3dén ballet.', ar: 'اشرب شاي' },
+            { t: 'Tekram 3énak, bass kol shi.', ar: 'تكرم عينك' }
           ],
-          firstTile: ['Mabrouk. Now it is a project.'],
-          lost: ['Ma t2akhed 3a albak. Bokra ba3d fi ba7er.'],
-          night: ['Rou7 nam, ya 3ammi. El ba7er mish rayeh.'],
-          swim: ['Yalla, tla3! The water is cold.']
+          firstTile: [{ t: 'Mabrouk. Halla2 sar mashrou3.', ar: 'مبروك' }],
+          lost: [{ t: 'Ma t2khod 3a 2albak. Bokra fi ba7er kamén.', ar: 'ما تاخد ع قلبك' }],
+          night: [{ t: 'Rou7 nam ya 3ammi. El ba7er mish rayé7.', ar: 'روح نام' }],
+          swim: [{ t: 'Yalla, tla3! El mayy barde.', ar: 'المي باردة' }],
+          spent: [{ t: 'Shouf 7alak. Rou7 kol knefe 3and Jardali.', ar: 'روح كول كنافة' }]
         }
       },
       {
-        id: 'samir', name: 'Abou Samir', voice: 1, hat: 'none', scale: 1.02,
+        id: 'ousama', name: 'Abou Ousama', voice: 1, hat: 'none', scale: 1.02,
         shirt: 0x7d8da0, hatCol: 0x2b2420, yaw: Math.PI * 0.12,
         at: function () { return { x: 8.5, y: DECK_Y, z: -4.2 }; },
         talk: [
           { t: 'Obbe ya Sayda.', ar: 'يا صيدا' },
-          'That castle? Crusaders built it. The sea is older than both of us.',
-          'I lost three nets out by the mole. It eats them.',
-          'When the water goes flat like oil — that is when it is lying to you.',
-          'Lay one for me. By the stairs. I will keep an eye on it.'
+          { t: 'Hal 2al3a? El Franj banouwa. El ba7er a2dam menna w mennon.', ar: 'القلعة' },
+          { t: 'Dayya3et tlet shabak 3and el mole. Byekolon.', ar: 'ضيّعت تلت شباك' },
+          { t: 'Lamma el mayy tseer malsa mitl el zét — hayda wa2t el kizb.', ar: 'مثل الزيت' },
+          { t: 'Hott wa7de 3anne. 3and el daraj. B2ellak 3aléha.', ar: 'حط وحدة عنّي' }
         ],
         lines: {
           greet: [{ t: 'Obbe ya Sayda.', ar: 'يا صيدا' }],
           idle: [
-            { t: 'Obbe ya Sayda.', ar: 'يا صيدا' },
-            'I fished here fifty years. The sea never changed.',
-            'The castle is still standing. So can you.',
-            'In my day we threw nets, not tiles.',
-            'Careful. It takes more than balat.'
+            { t: 'Sidet hon khamsin sene. El ba7er ma tghayyar.', ar: 'خمسين سنة' },
+            { t: 'El 2al3a lessa wa2fe. Fik inta kamén.', ar: 'لسا واقفة' },
+            { t: 'B ayyémna kenna nermi shabak, mish balat.', ar: 'شباك مش بلاط' },
+            { t: 'Dir balak. Badda aktar men balat.', ar: 'دير بالك' }
           ],
-          firstTile: ['Sahtein. Now the sea knows your name.'],
-          lost: ['It breathes in, it breathes out. Same sea.'],
-          squall: ['Tali3 3asfe. Get off the edge, ya 3ammi.'],
-          night: ['The lights of Sayda. Nothing like it.']
+          firstTile: [{ t: 'Sahtein. Halla2 el ba7er bya3ref ismak.', ar: 'صحتين' }],
+          lost: [{ t: 'Byesh7a2 w byezfor. Nafs el ba7er.', ar: 'نفس البحر' }],
+          squall: [{ t: 'Tal3it 3asfe. Ib3ed 3an el taraf ya 3ammi.', ar: 'طلعت عاصفة' }],
+          night: [{ t: 'Adwiyet Sayda. Ma fi mitla.', ar: 'أضوية صيدا' }],
+          spent: [{ t: 'El ba7er byekhod men el zalame shwayy shwayy.', ar: 'شوي شوي' }]
+        }
+      },
+      {
+        id: 'jardali', name: 'Jardali', voice: 2, hat: 'cap', scale: 1.0,
+        shirt: 0xf0ece0, hatCol: 0xedf6f3, yaw: 0, sells: 'knefe',
+        at: function (w) {
+          var k = w.knefe || { x: -24, y: DECK_Y, z: -9.4 };
+          return { x: k.x, y: DECK_Y, z: k.z - 3.2 };
+        },
+        lines: {
+          greet: [{ t: 'Knefe? Sakhne. Lessa tal3a.', ar: 'كنافة سخنة' }],
+          idle: [
+            { t: 'Knefe b jebne, mish b 2ashta. Hon Sayda.', ar: 'بجبنة مش بقشطة' },
+            { t: 'Jeddi fata7 hal mahall sent 48.', ar: 'سنة ٤٨' },
+            { t: 'Ballet, ballet. Bass fite2 kol.', ar: 'بس فطّر' }
+          ],
+          sold: [
+            { t: 'Sahtein. Hay sakhne.', ar: 'صحتين' },
+            { t: 'Kol, w ba3dén ballet.', ar: 'كول وبعدين بلّط' },
+            { t: 'Hay ma3 sha3rayyet ziyéde.', ar: 'مع شعيرية زيادة' }
+          ],
+          broke: [
+            { t: 'Ma ma3ak masari? Khod wa7de 3a 7sabe. Bass hal marra.', ar: 'ع حسابي' }
+          ],
+          pricey: [
+            { t: 'Khamse w 3eshrin. Mish ghali.', ar: 'خمسة وعشرين' },
+            { t: 'Ballet shwayy, w ta3a.', ar: 'بلّط شوي وتعا' }
+          ],
+          full: [
+            { t: 'Inta shab3an. Rou7 shtghol.', ar: 'انت شبعان' }
+          ],
+          spent: [{ t: 'Ta3a, ta3a. 2a3ed. Hay knefe.', ar: 'تعا قعود' }],
+          night: [{ t: 'Sakkerna. Bokra men el sob7.', ar: 'سكّرنا' }]
         }
       },
       {
@@ -926,25 +980,25 @@
         pace: 2.2,
         at: function () { return { x: -4.5, y: DECK_Y, z: -8.5 }; },
         talk: [
-          'Are you REALLY tiling the sea?!',
-          'How many is it now? I am counting too. I said {n}.',
-          'My teacher said impossible. I told her about you.',
-          'Can I hold the trowel? One time. One!',
-          'When it is finished I am walking all the way to Cyprus.'
+          { t: '3am tballet el ba7er?! SAH?!', ar: 'عم تبلّط البحر؟' },
+          { t: 'Kam sar? Ana 3am 3edd kamén. 2elet {n}.', ar: 'كم صار؟' },
+          { t: 'El m3allme 2alet mesta7il. 2eltella 3annak.', ar: 'قالت مستحيل' },
+          { t: 'Fine emsek el masta7? Marra! Marra wa7de!', ar: 'مرة وحدة!' },
+          { t: 'Lamma tkhalles ana mashe la 2ebros.', ar: 'لقبرص' }
         ],
         lines: {
-          greet: ['3am tballet el ba7er?! SAH?!', 'Are you really doing it?'],
+          greet: [{ t: '3am tballet el ba7er?! SAH?!', ar: 'عم تبلّط البحر؟' }],
           idle: [
-            'Can I help? I am strong.',
-            'My teacher said it is impossible.',
-            'If you finish, can I walk on it?',
-            'I counted. You are at {n}.'
+            { t: 'Fine se3dak? Ana 2awe.', ar: 'أنا قوي' },
+            { t: 'Iza khallasto, fine emshe 3aléha?', ar: 'فيني إمشي عليها؟' },
+            { t: '3eddét. Sirt 3and {n}.', ar: 'عدّيت' }
           ],
-          firstTile: ['IT STAYED! Did you see?!'],
-          lost: ['The sea ate it! It ATE it!'],
-          milestone: ['{m} metres! I am telling everyone!'],
-          squall: ['Waves! Big ones! Yalla!'],
-          swim: ['HE FELL IN! HE FELL IN!']
+          firstTile: [{ t: 'DALLET! Shefet?!', ar: 'ضلّت!' }],
+          lost: [{ t: 'El ba7er akala! AKALA!', ar: 'أكلها!' }],
+          milestone: [{ t: '{m} metr! 3am 2oul la kell el 3alam!', ar: 'لكل العالم' }],
+          squall: [{ t: 'Moj! Kbir! Yalla!', ar: 'موج كبير!' }],
+          swim: [{ t: 'WE2E3! WE2E3 BEL BA7ER!', ar: 'وقع بالبحر!' }],
+          spent: [{ t: 'Ta3ebt? Ana ma bet3ab abadan.', ar: 'ما بتعب أبدا' }]
         }
       },
       {
@@ -955,21 +1009,22 @@
           return { x: k.x - 1.5, y: DECK_Y, z: k.z + 1.3 };
         },
         talk: [
-          'Mouna in the barrow, balata in the sea. That is the whole trade.',
-          'Lay them tight. The sea finds every gap you leave.',
-          'The edge is where you lose. Build wide, not far.',
-          'I built the corniche wall in 88. It is still there. Mostly.',
-          'No charge for advice. Everything else would be extra.'
+          { t: 'Mouna b el 3arabaye, balata b el ba7er. Hayda kell el shughl.', ar: 'هيدا كل الشغل' },
+          { t: 'Hotton mazbout. El ba7er bilé2i kell faragh.', ar: 'بيلاقي كل فراغ' },
+          { t: 'El taraf huwwe wén btekhsar. Wassi3, ma tba33ed.', ar: 'وسّع، ما تبعّد' },
+          { t: 'Ana banét sour el kornish sent 88. Lessa wa2ef. Ta2riban.', ar: 'سنة ٨٨' },
+          { t: 'El nasi7a balash. Kell shi tene bi kallef.', ar: 'النصيحة بلاش' }
         ],
         lines: {
-          greet: ['You are the one tiling the sea. Ok.'],
+          greet: [{ t: 'Inta elli 3am tballet el ba7er. Tayyeb.', ar: 'طيّب' }],
           idle: [
-            'The sea is a terrible customer. Never pays.',
-            'Straight courses. Tight joints. That is all there is.',
-            'A balata laid in a hurry belongs to the sea already.'
+            { t: 'El ba7er zboun 3atel. Ma bidfa3.', ar: 'ما بيدفع' },
+            { t: 'Sfouf mestawye. Fawasel day2a. Bass hék.', ar: 'بس هيك' },
+            { t: 'Balata mesta3jale sar melk el ba7er.', ar: 'ملك البحر' }
           ],
-          lost: ['Cheap balat, cheap results. I said this.'],
-          milestone: ['{n} balata. Ya zalame. You are serious.']
+          lost: [{ t: 'Shefet el taraf? Men hon bye2ta3.', ar: 'من هون بيقطع' }],
+          milestone: [{ t: '{n} balata. Ya zalame. Inta jidde.', ar: 'يا زلمة' }],
+          spent: [{ t: 'Esta2id. El shughl ma bikhlas, w inta btekhlas.', ar: 'استقيد' }]
         }
       }
     ];
@@ -1042,8 +1097,40 @@
 
     /* Talking walks through a character's conversation in order and wraps, so
        pressing E repeatedly is a back-and-forth rather than a slot machine.
-       Im Khalil hands you mouna on the lines where she offers it. */
+       Im Kamel hands you mouna on the lines where she offers it. */
+    /* Jardali has no conversation of his own: pressing E at his counter buys
+       the knefe, and which line he gives you depends on how it went. */
+    function buyKnefe(npc) {
+      var kind;
+      if (S.health >= HEALTH_MAX - 0.5) {
+        kind = 'full';
+      } else if (S.lira >= KNEFE_PRICE) {
+        S.lira -= KNEFE_PRICE;
+        S.health = clamp(S.health + KNEFE_HEAL, 0, HEALTH_MAX);
+        S.knefeEaten++;
+        kind = 'sold';
+        sfx.purchase();
+        hud.toast('Knefe b jebne. +' + KNEFE_HEAL + ' · −' + KNEFE_PRICE + ' l.l.', 'good');
+        pushStats();
+      } else if (S.health <= 25) {
+        // he is not going to watch you fold over 25 lira
+        S.health = clamp(S.health + KNEFE_HEAL, 0, HEALTH_MAX);
+        S.knefeEaten++;
+        kind = 'broke';
+        sfx.purchase();
+        hud.toast('3a 7sabe — on the house.', 'good');
+        pushStats();
+      } else {
+        kind = 'pricey';
+        sfx.ui();
+      }
+      if (!npcSay(npc, kind)) npcSay(npc, 'idle');
+      npc.facing = 1.4;
+      return true;
+    }
+
     function talkTo(npc) {
+      if (npc.def.sells === 'knefe') return buyKnefe(npc);
       var pool = npc.def.talk;
       if (!pool || !pool.length) return;
       var at = npc.talkIdx % pool.length;
@@ -1154,7 +1241,8 @@
       statsDirty = false;
       hud.setStats({
         mortar: Math.floor(S.mortar), mortarMax: S.mortarMax,
-        tiles: sim.count, metres: sim.count * 4,
+        tiles: sim.count, metres: sim.count * 4, lira: Math.floor(S.lira),
+        health: S.health, healthMax: HEALTH_MAX,
         tierIdx: 0, swell: waves.swell(S.elapsed),
         laid: S.laid, lost: S.lost
       });
@@ -1163,7 +1251,8 @@
     // ---------------------------------------------------------- save / load
     function serialize() {
       return {
-        v: 3, sim: sim.serialize(), mortar: S.mortar,
+        v: 4, sim: sim.serialize(), mortar: S.mortar,
+        health: S.health, lira: S.lira, knefeEaten: S.knefeEaten,
         elapsed: S.elapsed, laid: S.laid, lost: S.lost,
         px: body.pos.x, py: body.pos.y, pz: body.pos.z
       };
@@ -1172,10 +1261,13 @@
       try { localStorage.setItem(SAVE_KEY, JSON.stringify(serialize())); } catch (e) { /* private window */ }
     }
     function applySave(d) {
-      if (!d || d.v !== 3) return false;
+      if (!d || d.v !== 4) return false;
       try {
         if (d.sim) sim.load(d.sim);
         S.mortar = d.mortar || 0;
+        S.health = typeof d.health === 'number' ? d.health : HEALTH_MAX;
+        S.lira = d.lira || 0;
+        S.knefeEaten = d.knefeEaten || 0;
         S.elapsed = d.elapsed || 0; S.laid = d.laid || 0; S.lost = d.lost || 0;
         tiles.clear();
         sim.forEach(function (t) { tiles.add(t.i, t.j, t.tier); });
@@ -1253,11 +1345,13 @@
       if (moveVec.lengthSq() > 1) moveVec.normalize();
       if (S.started && (mx || mz)) facing = Math.atan2(moveVec.x, moveVec.z);
 
+      // under a quarter health you slow down; empty, you can barely walk
+      var legs = S.health <= 0 ? 0.45 : (S.health < 25 ? 0.7 : 1);
       var input = {
-        moveX: S.started ? moveVec.x : 0,
-        moveZ: S.started ? moveVec.z : 0,
-        jump: !!keys.Space,
-        run: !!(keys.ShiftLeft || keys.ShiftRight)
+        moveX: S.started ? moveVec.x * legs : 0,
+        moveZ: S.started ? moveVec.z * legs : 0,
+        jump: !!keys.Space && S.health > 0,
+        run: !!(keys.ShiftLeft || keys.ShiftRight) && S.health > 25
       };
       body.step(dt, t, input, waves);
 
@@ -1299,7 +1393,10 @@
       if (S.started && t > S.nextInspection) {
         S.nextInspection = t + INSPECTION_EVERY;
         if (sim.count > 0) {
-          hud.toast('Inspection: ' + sim.count * 4 + ' m² still standing.', 'good');
+          var pay = sim.count * PAY_PER_SURVIVING;
+          S.lira += pay;
+          hud.toast('Inspection: ' + sim.count * 4 + ' m² standing. +' + pay + ' l.l.', 'good');
+          pushStats();
         }
       }
 
@@ -1323,8 +1420,28 @@
       mason.group.rotation.y = lerp(mason.group.rotation.y, facing, clamp(dt * 11, 0, 1));
       var spd = Math.sqrt(body.vel.x * body.vel.x + body.vel.z * body.vel.z);
       mason.animate(dt, spd, body.inWater, mason.state.lay > 0.05);
-      if (body.inWater && !S.wasInWater) npcEvent('swim');
+      if (body.inWater && !S.wasInWater) {
+        npcEvent('swim');
+        S.health = Math.max(0, S.health - SOAK_HIT);
+        pushStats();
+      }
       S.wasInWater = body.inWater;
+
+      // stamina drains by what you are actually doing
+      if (S.started) {
+        var drain = DRAIN_IDLE;
+        if (body.inWater) drain = DRAIN_WATER;
+        else if (digging) drain = DRAIN_DIG;
+        else if (input.run && spd > 0.5) drain = DRAIN_RUN;
+        var before = S.health;
+        S.health = clamp(S.health - drain * dt, 0, HEALTH_MAX);
+        if (Math.floor(before) !== Math.floor(S.health)) pushStats();
+        if (before > 25 && S.health <= 25) hud.toast('You are running out of steam. Knefe.', 'bad');
+        if (before > 0 && S.health <= 0) {
+          hud.toast('Khalas — you cannot lift another balata. Jardali is up the corniche.', 'bad');
+          npcEvent('spent');
+        }
+      }
       if (body.inWater && Math.random() < dt * 3) {
         fx.burst(body.pos.x, 0.1, body.pos.z, 0.45);
       }
@@ -1433,7 +1550,7 @@
   function go() {
     if (!window.THREE) { document.getElementById('fatal').hidden = false; return; }
     var hot = window.claude && window.claude.hot;
-    if (hot && hot.ready) hot.ready(function (data) { window.__blb = boot((data && data.v === 3) ? data : loadSaved()); });
+    if (hot && hot.ready) hot.ready(function (data) { window.__blb = boot((data && data.v === 4) ? data : loadSaved()); });
     else window.__blb = boot(loadSaved());
   }
 
