@@ -888,20 +888,30 @@
         'background:#0b3a4f;color:#edf6f3;text-align:center;padding:24px}' +
         '#trotate b{font:700 22px/1.1 "Reem Kufi",system-ui,sans-serif;letter-spacing:.04em}' +
         '#trotate span{font-size:14px;letter-spacing:.14em;text-transform:uppercase;opacity:.75}' +
-        '@media (orientation:portrait){#trotate{display:flex}}';
+        '@media (orientation:portrait){#trotate{display:flex}}' +
+        // a phone on its side is only ~360-430px tall: smaller stick and buttons
+        '@media (max-height:500px){' +
+        '#tstick{width:104px;height:104px;left:calc(14px + env(safe-area-inset-left,0px));bottom:calc(14px + env(safe-area-inset-bottom,0px))}' +
+        '#tnub{width:42px;height:42px;margin:-21px 0 0 -21px}' +
+        '#tbtns{gap:6px;right:calc(12px + env(safe-area-inset-right,0px));bottom:calc(14px + env(safe-area-inset-bottom,0px))}' +
+        '#tbtns button{font-size:14px;padding:9px 14px;border-width:2px;min-width:92px}' +
+        '#tlay{font-size:18px!important}}';
       document.head.appendChild(st);
       document.body.appendChild(wrap);
       var stick = wrap.querySelector('#tstick'), nub = wrap.querySelector('#tnub');
       stick.addEventListener('pointerdown', function (e) {
         touch.moveId = e.pointerId; var r = stick.getBoundingClientRect();
         touch.ox = r.left + r.width / 2; touch.oy = r.top + r.height / 2;
+        touch.rad = r.width * 0.35; touch.trav = r.width * 0.26;
         stick.setPointerCapture(e.pointerId); sfx.unlock();
       });
       stick.addEventListener('pointermove', function (e) {
         if (e.pointerId !== touch.moveId) return;
-        var dx = clamp((e.clientX - touch.ox) / 46, -1, 1), dy = clamp((e.clientY - touch.oy) / 46, -1, 1);
+        // throw and knob travel follow the stick's real size (smaller on short screens)
+        var rad = touch.rad || 46, trav = touch.trav || 34;
+        var dx = clamp((e.clientX - touch.ox) / rad, -1, 1), dy = clamp((e.clientY - touch.oy) / rad, -1, 1);
         touch.moveX = dx; touch.moveZ = -dy;
-        nub.style.transform = 'translate(' + (dx * 34) + 'px,' + (-touch.moveZ * 34) + 'px)';
+        nub.style.transform = 'translate(' + (dx * trav) + 'px,' + (-touch.moveZ * trav) + 'px)';
       });
       function endStick(e) {
         if (e.pointerId !== touch.moveId) return;
