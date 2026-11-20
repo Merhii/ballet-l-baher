@@ -415,10 +415,13 @@ check('BLB_ADS schema, pick, draw', () => {
   if (list[0].placements.join() !== 'souk') throw new Error('placements not filtered');
   if (list[0].bg !== '#0B3A4F' || list[0].weight !== 10) throw new Error('bad field not defaulted/clamped');
   const d = A.normalize(A.DEFAULTS);
-  for (const p of A.PLACEMENTS) if (!A.pick(d, p)) throw new Error('no default ad for ' + p);
-  if (A.pick([{ ...d[0], active: false }], 'souk')) throw new Error('inactive ad picked');
+  if (!d.length || !A.pick(d, d[0].placements[0])) throw new Error('default ad not pickable');
+  if (A.pick([{ ...d[0], active: false }], d[0].placements[0])) throw new Error('inactive ad picked');
+  const legacy = A.normalize([{ placements: ['corniche'] }])[0].placements.join();
+  if (legacy !== 'corniche-w,corniche-e') throw new Error('legacy corniche not split: ' + legacy);
   A.draw(document.createElement('canvas').getContext('2d'), 1024, 512, d[0]);
-  return d.length + ' default ads across ' + A.PLACEMENTS.length + ' locations';
+  A.draw(document.createElement('canvas').getContext('2d'), 1024, 512, A.VACANT);
+  return d.length + ' default ad(s) across ' + A.PLACEMENTS.length + ' locations';
 });
 check('HUD menu, health, faint', () => {
   ['showMenu', 'hideMenu', 'isMenuOpen', 'setBuffs', 'hurt', 'showFaint', 'hideFaint']

@@ -176,7 +176,7 @@
         </div>
       </div>
     </div>
-    <div class="empty hide" id="noAd">No ads yet. Add one — the billboards show “Your ad here” until you do.</div>
+    <div class="empty hide" id="noAd">No ads yet. Add one — the billboards show “Ad space coming soon” until you do.</div>
   </section>
 </main>
 
@@ -274,7 +274,7 @@
       d.querySelector('b').textContent = A.PLACEMENT_NAMES[p] || p;
       d.querySelector('.meta').textContent = pool.length
         ? pool.map(function (a) { return a.sponsor + ' ' + Math.round(a.weight / total * 100) + '%'; }).join(' · ')
-        : 'Nothing live today — shows “Your ad here”.';
+        : 'Nothing booked — shows “Ad space coming soon · inquire in Credits”.';
       if (!pool.length) d.querySelector('.share').style.background = 'repeating-linear-gradient(135deg,transparent 0 6px,rgba(11,58,79,.15) 6px 7px)';
       box.appendChild(d);
     });

@@ -1363,8 +1363,7 @@
           '<p>Want your brand on the billboards along the corniche, the food-court roofs or the ' +
             'harbour mole? Email <a href="mailto:' + CONTACT.email + '?subject=' +
             encodeURIComponent('Billboard on Ballet l Ba7er') + '">' + CONTACT.email + '</a>.</p>' +
-          '<p>The sponsors on the billboards right now are invented. ' +
-          'The sea does not issue receipts.</p></div>' + back;
+          '<p>The sea does not issue receipts.</p></div>' + back;
       } else if (name === 'confirm-new') {
         html += '<h3>Start over? <span class="ar">من جديد؟</span></h3><div class="blb-confirm">' +
           '<p>This throws away your saved sea — every balata, every lira. The sea will ' +

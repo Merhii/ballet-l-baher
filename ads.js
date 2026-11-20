@@ -16,53 +16,36 @@
   var PREVIEW_KEY = 'blb.ads.preview';
   var STATS_KEY = 'blb.ads.stats';
   /* Billboard locations in the world. An ad lists the ones it is booked on. */
-  var PLACEMENTS = ['corniche', 'souk', 'qalaa', 'harbour'];
+  var PLACEMENTS = ['corniche-w', 'corniche-e', 'souk', 'qalaa', 'harbour'];
   var PLACEMENT_NAMES = {
-    corniche: 'Corniche hoardings (behind the promenade)',
+    'corniche-w': 'Corniche west hoarding (by the stairs)',
+    'corniche-e': 'Corniche east hoarding (by Souk el Akel)',
     souk: 'Souk el Akel roof (east food court)',
     qalaa: 'Sahet el Qal3a roof (west food court)',
     harbour: 'Harbour mole (seen from the water)'
   };
   var LAYOUTS = ['poster', 'split', 'stamp'];
 
-  /* Every sponsor here is invented. Swap them out in the CMS. */
+  /* What runs when ads.json cannot be reached (offline, file://). Keep it in
+     step with ads.json. */
   var DEFAULTS = [
     {
-      id: 'mouna-abou-khalil', active: true, sponsor: 'Mouna Abou Khalil',
-      headline: 'Cement that almost holds.', ar: 'مونة أبو خليل',
-      tagline: 'Family recipe since the last flood', layout: 'poster',
-      bg: '#B9502F', fg: '#EDF6F3', accent: '#F2B733',
-      placements: ['corniche', 'souk', 'qalaa', 'harbour'], weight: 3, start: '', end: ''
-    },
-    {
-      id: 'kaake-express', active: true, sponsor: 'Ka3ke Express',
-      headline: 'Still warm when it reaches the corniche.', ar: 'كعكة إكسبرس',
-      tagline: 'Za3tar extra · no extra charge', layout: 'split',
-      bg: '#E4D7B3', fg: '#0B3A4F', accent: '#B9502F',
-      placements: ['corniche', 'souk', 'qalaa'], weight: 2, start: '', end: ''
-    },
-    {
-      id: 'moteur-abou-ali', active: true, sponsor: 'Moteur Abou Ali',
-      headline: 'Twelve hours of light. Guaranteed.*', ar: 'موتور أبو علي',
-      tagline: '*not guaranteed', layout: 'stamp',
-      bg: '#0B3A4F', fg: '#F2B733', accent: '#EDF6F3',
-      placements: ['corniche', 'harbour'], weight: 2, start: '', end: ''
-    },
-    {
-      id: 'nadi-sayda', active: true, sponsor: 'Nadi Sayda lel Sba7a',
-      headline: 'Already in the water? Might as well join.', ar: 'نادي صيدا للسباحة',
-      tagline: 'Saida swimming club · members swim free', layout: 'poster',
-      bg: '#16708C', fg: '#EDF6F3', accent: '#F6C445',
-      placements: ['harbour', 'qalaa'], weight: 1, start: '', end: ''
-    },
-    {
-      id: 'balat-ikhwan', active: true, sponsor: 'Balat el Ikhwan',
-      headline: 'Our tiles survive the sea. Yours do not.', ar: 'بلاط الإخوان',
-      tagline: 'Showroom behind the Khan · ask for Fadi', layout: 'split',
-      bg: '#EDF6F3', fg: '#0B3A4F', accent: '#2E7FA8',
-      placements: ['corniche', 'souk'], weight: 1, start: '', end: ''
+      id: 'puzzlebooth', active: true, sponsor: 'PuzzleBooth',
+      headline: 'Photobooths for weddings & events across Lebanon', ar: '',
+      tagline: 'Mirror · 360 · Mosaic  —  puzzleslb.com/puzzlebooth', layout: 'poster',
+      bg: '#000000', fg: '#FFFFFF', accent: '#34AD54',
+      placements: ['corniche-w'], weight: 1, start: '', end: ''
     }
   ];
+
+  /* What a board shows when no ad is booked on it: the space is for sale. */
+  var VACANT = {
+    id: 'vacant', active: true, sponsor: 'Ad space coming soon',
+    headline: 'Your brand on the Saida corniche.', ar: 'إعلانك هون قريبًا',
+    tagline: 'Inquire in Credits  ·  mmerhikarim@gmail.com', layout: 'poster',
+    bg: '#E4D7B3', fg: '#0B3A4F', accent: '#F2B733',
+    placements: [], weight: 0, start: '', end: ''
+  };
 
   // ---------------------------------------------------------------- helpers
   function str(v, max) {
@@ -87,9 +70,11 @@
       var id = slug(a.id || a.sponsor || ('ad-' + (i + 1))) || ('ad-' + (i + 1));
       while (seen[id]) id += '-x';
       seen[id] = true;
-      var pl = Array.isArray(a.placements) ? a.placements.filter(function (p) {
-        return PLACEMENTS.indexOf(p) >= 0;
-      }) : PLACEMENTS.slice();
+      // older lists booked one 'corniche' location for both hoardings
+      var raw = Array.isArray(a.placements) ? a.placements.reduce(function (acc, p) {
+        return acc.concat(p === 'corniche' ? ['corniche-w', 'corniche-e'] : [p]);
+      }, []) : PLACEMENTS.slice();
+      var pl = PLACEMENTS.filter(function (p) { return raw.indexOf(p) >= 0; });
       out.push({
         id: id,
         active: a.active !== false,
@@ -219,18 +204,21 @@
       // poster: hazard band, big Arabic, headline, tagline footer
       chevrons(g, 0, 0, w, Math.round(h * 0.07), ad.accent, ad.bg);
       g.fillStyle = ad.fg; g.textAlign = 'center'; g.textBaseline = 'middle';
-      fit(g, ad.ar || ad.sponsor, '700', Math.round(h * 0.25), AR_FONT, w - pad * 2);
-      g.fillText(ad.ar || ad.sponsor, w / 2, h * 0.32);
+      // the big line: the Arabic name, or — for a brand without one — its
+      // name as a Latin wordmark, which then is not repeated in the footer
+      var big = ad.ar || ad.sponsor.toUpperCase();
+      fit(g, big, '700', Math.round(h * 0.25), ad.ar ? AR_FONT : LAT_FONT, w - pad * 2);
+      g.fillText(big, w / 2, h * 0.32);
       g.textBaseline = 'alphabetic';
       fit(g, ad.headline, '700', Math.round(h * 0.11), LAT_FONT, w - pad * 2);
       g.fillText(ad.headline, w / 2, h * 0.66);
       g.fillStyle = ad.accent;
       g.fillRect(0, h - h * 0.17, w, h * 0.17);
       g.fillStyle = ad.bg;
-      fit(g, ad.sponsor.toUpperCase() + (ad.tagline ? '  ·  ' + ad.tagline : ''), '700',
-        Math.round(h * 0.07), LAT_FONT, w - pad * 2);
+      var foot = ad.ar ? ad.sponsor.toUpperCase() + (ad.tagline ? '  ·  ' + ad.tagline : '') : ad.tagline;
+      fit(g, foot, '700', Math.round(h * 0.07), LAT_FONT, w - pad * 2);
       g.textBaseline = 'middle';
-      g.fillText(ad.sponsor.toUpperCase() + (ad.tagline ? '  ·  ' + ad.tagline : ''), w / 2, h - h * 0.085);
+      g.fillText(foot, w / 2, h - h * 0.085);
     }
 
     // the little disclosure tag every ad carries
@@ -319,7 +307,7 @@
   }
 
   root.BLB_ADS = {
-    DEFAULTS: DEFAULTS, PLACEMENTS: PLACEMENTS, PLACEMENT_NAMES: PLACEMENT_NAMES, LAYOUTS: LAYOUTS,
+    DEFAULTS: DEFAULTS, VACANT: VACANT, PLACEMENTS: PLACEMENTS, PLACEMENT_NAMES: PLACEMENT_NAMES, LAYOUTS: LAYOUTS,
     PREVIEW_KEY: PREVIEW_KEY, STATS_KEY: STATS_KEY,
     normalize: normalize, eligible: eligible, pick: pick, draw: draw, load: load,
     readPreview: readPreview, writePreview: writePreview, clearPreview: clearPreview,

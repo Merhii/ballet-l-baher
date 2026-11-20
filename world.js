@@ -1727,8 +1727,8 @@
   function adSlotList() {
     return [
       // `base` is what the legs stand on: deck, a stall roof, the mole's top
-      { id: 'corniche-w', placement: 'corniche', x: -16, base: 1.5, y: 5.0, z: -32.2, ry: 0, w: 9, h: 4.5 },
-      { id: 'corniche-e', placement: 'corniche', x: 31, base: 1.5, y: 5.0, z: -32.6, ry: 0, w: 9, h: 4.5 },
+      { id: 'corniche-w', placement: 'corniche-w', x: -16, base: 1.5, y: 5.0, z: -32.2, ry: 0, w: 9, h: 4.5 },
+      { id: 'corniche-e', placement: 'corniche-e', x: 31, base: 1.5, y: 5.0, z: -32.6, ry: 0, w: 9, h: 4.5 },
       { id: 'souk', placement: 'souk', x: FOOD_COURTS[0].cx, base: 4.87, y: 5.6, z: FOOD_COURTS[0].cz - 2.6, ry: 0, w: 8, h: 4 },
       { id: 'qalaa', placement: 'qalaa', x: FOOD_COURTS[1].cx, base: 4.87, y: 5.6, z: FOOD_COURTS[1].cz - 2.6, ry: 0, w: 8, h: 4 },
       { id: 'harbour', placement: 'harbour', x: -50, base: 2.3, y: 3.2, z: 51, ry: 2.12, w: 12, h: 6 }

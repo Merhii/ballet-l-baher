@@ -1433,11 +1433,8 @@
     var ADS = window.BLB_ADS;
     var adList = ADS ? ADS.normalize(ADS.DEFAULTS) : [];
     var adSource = 'defaults';
-    var HOUSE_AD = {
-      id: 'house', sponsor: 'Your ad here', ar: 'إعلانك هون',
-      headline: 'This board is free. Put your brand on the corniche.', tagline: 'mmerhikarim@gmail.com',
-      layout: 'poster', bg: '#E4D7B3', fg: '#0B3A4F', accent: '#F2B733'
-    };
+    // an unbooked board advertises itself: "coming soon, inquire in Credits"
+    var HOUSE_AD = ADS ? ADS.VACANT : null;
     var boards = [];
     (function buildBoards() {
       var slots = world.adSlots || [];
@@ -1532,7 +1529,7 @@
           if (b.flip === 0) { b.face.scale.y = 1; b.next = 24 + Math.random() * 8; }
         }
         // impression: on screen, near enough to read, for over a second
-        if (!b.counted && b.ad && b.ad.id !== 'house') {
+        if (!b.counted && b.ad) {
           boardV.set(b.slot.x, b.slot.y + b.slot.h / 2, b.slot.z);
           var dist = boardV.distanceTo(camera.position);
           boardV.project(camera);

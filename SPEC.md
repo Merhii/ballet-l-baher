@@ -101,7 +101,7 @@ world.kiosk             // { x, y, z } the muallim's kiosk on the deck (upgrade 
 world.foodCourts        // [{ id, name, ar, x, y, z, stalls:[{ id, ar, x, y, z }] }] — stall id = food id;
                         //   (x, z) is where the customer stands, the vendor is 3.1 m inland of it
 world.adSlots           // [{ id, placement, x, base, y, z, ry, w, h }] billboard sites; the game hangs
-                        //   the boards. placement ∈ corniche|souk|qalaa|harbour (see ads.js)
+                        //   the boards. placement ∈ corniche-w|corniche-e|souk|qalaa|harbour (see ads.js)
 world.heckler           // { x, y, z } where the heckling uncle stands (on the deck, by the railing)
 world.dispose()
 ```
