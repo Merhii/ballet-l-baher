@@ -51,6 +51,336 @@
 
 </script>
 <script>
+/* ==== ads.js ==== */
+/* BALLET L BA7ER — ads.js   →   window.BLB_ADS
+ *
+ * The in-game advertising: billboards standing in the 3D world (on the
+ * corniche, on the food-court roofs, out on the harbour mole). One schema, one
+ * renderer, shared by the game and by the CMS page that edits them. Ads are TEXT + COLOUR, painted onto a canvas at
+ * runtime — no image URLs, so the no-external-assets rule still holds.
+ *
+ * Where the live list comes from, in order:
+ *   1. a preview the CMS pushed into this browser (localStorage)
+ *   2. ads.json next to the page (what the CMS publishes)
+ *   3. DEFAULTS below, so file:// and offline still have something to show
+ * Plain script, ES2017, attaches one global. */
+(function (root) {
+  'use strict';
+
+  var PREVIEW_KEY = 'blb.ads.preview';
+  var STATS_KEY = 'blb.ads.stats';
+  /* Billboard locations in the world. An ad lists the ones it is booked on. */
+  var PLACEMENTS = ['corniche', 'souk', 'qalaa', 'harbour'];
+  var PLACEMENT_NAMES = {
+    corniche: 'Corniche hoardings (behind the promenade)',
+    souk: 'Souk el Akel roof (east food court)',
+    qalaa: 'Sahet el Qal3a roof (west food court)',
+    harbour: 'Harbour mole (seen from the water)'
+  };
+  var LAYOUTS = ['poster', 'split', 'stamp'];
+
+  /* Every sponsor here is invented. Swap them out in the CMS. */
+  var DEFAULTS = [
+    {
+      id: 'mouna-abou-khalil', active: true, sponsor: 'Mouna Abou Khalil',
+      headline: 'Cement that almost holds.', ar: 'مونة أبو خليل',
+      tagline: 'Family recipe since the last flood', layout: 'poster',
+      bg: '#B9502F', fg: '#EDF6F3', accent: '#F2B733',
+      placements: ['corniche', 'souk', 'qalaa', 'harbour'], weight: 3, start: '', end: ''
+    },
+    {
+      id: 'kaake-express', active: true, sponsor: 'Ka3ke Express',
+      headline: 'Still warm when it reaches the corniche.', ar: 'كعكة إكسبرس',
+      tagline: 'Za3tar extra · no extra charge', layout: 'split',
+      bg: '#E4D7B3', fg: '#0B3A4F', accent: '#B9502F',
+      placements: ['corniche', 'souk', 'qalaa'], weight: 2, start: '', end: ''
+    },
+    {
+      id: 'moteur-abou-ali', active: true, sponsor: 'Moteur Abou Ali',
+      headline: 'Twelve hours of light. Guaranteed.*', ar: 'موتور أبو علي',
+      tagline: '*not guaranteed', layout: 'stamp',
+      bg: '#0B3A4F', fg: '#F2B733', accent: '#EDF6F3',
+      placements: ['corniche', 'harbour'], weight: 2, start: '', end: ''
+    },
+    {
+      id: 'nadi-sayda', active: true, sponsor: 'Nadi Sayda lel Sba7a',
+      headline: 'Already in the water? Might as well join.', ar: 'نادي صيدا للسباحة',
+      tagline: 'Saida swimming club · members swim free', layout: 'poster',
+      bg: '#16708C', fg: '#EDF6F3', accent: '#F6C445',
+      placements: ['harbour', 'qalaa'], weight: 1, start: '', end: ''
+    },
+    {
+      id: 'balat-ikhwan', active: true, sponsor: 'Balat el Ikhwan',
+      headline: 'Our tiles survive the sea. Yours do not.', ar: 'بلاط الإخوان',
+      tagline: 'Showroom behind the Khan · ask for Fadi', layout: 'split',
+      bg: '#EDF6F3', fg: '#0B3A4F', accent: '#2E7FA8',
+      placements: ['corniche', 'souk'], weight: 1, start: '', end: ''
+    }
+  ];
+
+  // ---------------------------------------------------------------- helpers
+  function str(v, max) {
+    var s = v == null ? '' : String(v);
+    return max && s.length > max ? s.slice(0, max) : s;
+  }
+  function colour(v, d) {
+    return /^#[0-9a-fA-F]{6}$/.test(String(v || '')) ? String(v) : d;
+  }
+  function slug(s) {
+    return str(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
+  }
+
+  /* Normalise anything that claims to be an ad list: a bare array, or the
+     { ads: [...] } envelope ads.json uses. Bad fields fall back, never throw. */
+  function normalize(input) {
+    var list = Array.isArray(input) ? input : (input && Array.isArray(input.ads) ? input.ads : []);
+    var seen = {};
+    var out = [];
+    for (var i = 0; i < list.length; i++) {
+      var a = list[i] || {};
+      var id = slug(a.id || a.sponsor || ('ad-' + (i + 1))) || ('ad-' + (i + 1));
+      while (seen[id]) id += '-x';
+      seen[id] = true;
+      var pl = Array.isArray(a.placements) ? a.placements.filter(function (p) {
+        return PLACEMENTS.indexOf(p) >= 0;
+      }) : PLACEMENTS.slice();
+      out.push({
+        id: id,
+        active: a.active !== false,
+        sponsor: str(a.sponsor, 48) || 'Sponsor',
+        headline: str(a.headline, 90),
+        ar: str(a.ar, 48),
+        tagline: str(a.tagline, 80),
+        layout: LAYOUTS.indexOf(a.layout) >= 0 ? a.layout : 'poster',
+        bg: colour(a.bg, '#0B3A4F'),
+        fg: colour(a.fg, '#EDF6F3'),
+        accent: colour(a.accent, '#F2B733'),
+        placements: pl,
+        weight: Math.max(0, Math.min(10, Number(a.weight) || 1)),
+        start: str(a.start, 10),
+        end: str(a.end, 10)
+      });
+    }
+    return out;
+  }
+
+  function today() {
+    var d = new Date();
+    return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+  }
+
+  /* Active, scheduled for today, and booked into this placement. */
+  function eligible(list, placement, day) {
+    day = day || today();
+    return (list || []).filter(function (a) {
+      if (!a.active || a.weight <= 0) return false;
+      if (placement && a.placements.indexOf(placement) < 0) return false;
+      if (a.start && day < a.start) return false;
+      if (a.end && day > a.end) return false;
+      return true;
+    });
+  }
+
+  /* Weighted pick that avoids repeating `notId` when there is any choice. */
+  function pick(list, placement, notId, rnd) {
+    var pool = eligible(list, placement);
+    if (pool.length > 1 && notId) pool = pool.filter(function (a) { return a.id !== notId; });
+    if (!pool.length) return null;
+    var total = 0, i;
+    for (i = 0; i < pool.length; i++) total += pool[i].weight;
+    var r = (rnd || Math.random)() * total;
+    for (i = 0; i < pool.length; i++) { r -= pool[i].weight; if (r <= 0) return pool[i]; }
+    return pool[pool.length - 1];
+  }
+
+  // ---------------------------------------------------------------- render
+  var AR_FONT = '"Reem Kufi","Noto Naskh Arabic","Geeza Pro","Al Bayan","Segoe UI",sans-serif';
+  var LAT_FONT = '"Barlow Condensed",system-ui,-apple-system,"Segoe UI",sans-serif';
+
+  /* Shrink a font until the line fits, so long CMS copy never runs off. */
+  function fit(g, text, weight, size, family, maxW) {
+    var s = size;
+    g.font = weight + ' ' + s + 'px ' + family;
+    while (s > 10 && g.measureText(text).width > maxW) {
+      s -= 2;
+      g.font = weight + ' ' + s + 'px ' + family;
+    }
+    return s;
+  }
+
+  function chevrons(g, x, y, w, h, a, b) {
+    g.save();
+    g.beginPath(); g.rect(x, y, w, h); g.clip();
+    g.fillStyle = b; g.fillRect(x, y, w, h);
+    g.fillStyle = a;
+    var step = h * 1.4;
+    for (var k = -h * 2; k < w + h * 2; k += step) {
+      g.beginPath();
+      g.moveTo(x + k, y + h); g.lineTo(x + k + step / 2, y + h);
+      g.lineTo(x + k + step / 2 + h * 0.6, y); g.lineTo(x + k + h * 0.6, y);
+      g.closePath(); g.fill();
+    }
+    g.restore();
+  }
+
+  /* Paint one ad into a w×h canvas context. Aspect is assumed ~2:1. */
+  function draw(g, w, h, ad) {
+    ad = ad || normalize([{}])[0];
+    var pad = Math.round(h * 0.07);
+    g.save();
+    g.textAlign = 'left';
+    g.textBaseline = 'alphabetic';
+    g.fillStyle = ad.bg; g.fillRect(0, 0, w, h);
+
+    if (ad.layout === 'split') {
+      // accent block carrying the Arabic name, copy on the right
+      var bw = Math.round(w * 0.42);
+      g.fillStyle = ad.accent; g.fillRect(0, 0, bw, h);
+      g.fillStyle = ad.bg;
+      g.textAlign = 'center'; g.textBaseline = 'middle';
+      fit(g, ad.ar || ad.sponsor, '700', Math.round(h * 0.26), AR_FONT, bw - pad * 2);
+      g.fillText(ad.ar || ad.sponsor, bw / 2, h * 0.46);
+      g.textAlign = 'left'; g.textBaseline = 'alphabetic';
+      var cx = bw + pad, cw = w - bw - pad * 2;
+      g.fillStyle = ad.fg;
+      fit(g, ad.sponsor.toUpperCase(), '700', Math.round(h * 0.075), LAT_FONT, cw);
+      g.globalAlpha = 0.75; g.fillText(ad.sponsor.toUpperCase(), cx, pad + h * 0.08); g.globalAlpha = 1;
+      wrap(g, ad.headline, cx, h * 0.36, cw, Math.round(h * 0.13), ad.fg, 3);
+      g.fillStyle = ad.accent;
+      fit(g, ad.tagline, '600', Math.round(h * 0.07), LAT_FONT, cw);
+      g.fillText(ad.tagline, cx, h - pad * 1.2);
+    } else if (ad.layout === 'stamp') {
+      // a round municipal-looking stamp beside the copy
+      var r = h * 0.34, sx = w - pad - r, sy = h / 2;
+      g.strokeStyle = ad.accent; g.lineWidth = h * 0.025;
+      g.beginPath(); g.arc(sx, sy, r, 0, Math.PI * 2); g.stroke();
+      g.lineWidth = h * 0.008;
+      g.beginPath(); g.arc(sx, sy, r * 0.86, 0, Math.PI * 2); g.stroke();
+      g.save(); g.translate(sx, sy); g.rotate(-0.22);
+      g.fillStyle = ad.accent; g.textAlign = 'center'; g.textBaseline = 'middle';
+      fit(g, ad.ar || ad.sponsor, '700', Math.round(h * 0.15), AR_FONT, r * 1.6);
+      g.fillText(ad.ar || ad.sponsor, 0, 0);
+      g.restore();
+      var tw = w - r * 2 - pad * 3.5;
+      g.fillStyle = ad.fg;
+      fit(g, ad.sponsor.toUpperCase(), '700', Math.round(h * 0.14), LAT_FONT, tw);
+      g.fillText(ad.sponsor.toUpperCase(), pad, h * 0.3);
+      wrap(g, ad.headline, pad, h * 0.5, tw, Math.round(h * 0.1), ad.fg, 2);
+      g.fillStyle = ad.accent;
+      fit(g, ad.tagline, '600', Math.round(h * 0.065), LAT_FONT, tw);
+      g.fillText(ad.tagline, pad, h - pad * 1.3);
+    } else {
+      // poster: hazard band, big Arabic, headline, tagline footer
+      chevrons(g, 0, 0, w, Math.round(h * 0.07), ad.accent, ad.bg);
+      g.fillStyle = ad.fg; g.textAlign = 'center'; g.textBaseline = 'middle';
+      fit(g, ad.ar || ad.sponsor, '700', Math.round(h * 0.25), AR_FONT, w - pad * 2);
+      g.fillText(ad.ar || ad.sponsor, w / 2, h * 0.32);
+      g.textBaseline = 'alphabetic';
+      fit(g, ad.headline, '700', Math.round(h * 0.11), LAT_FONT, w - pad * 2);
+      g.fillText(ad.headline, w / 2, h * 0.66);
+      g.fillStyle = ad.accent;
+      g.fillRect(0, h - h * 0.17, w, h * 0.17);
+      g.fillStyle = ad.bg;
+      fit(g, ad.sponsor.toUpperCase() + (ad.tagline ? '  ·  ' + ad.tagline : ''), '700',
+        Math.round(h * 0.07), LAT_FONT, w - pad * 2);
+      g.textBaseline = 'middle';
+      g.fillText(ad.sponsor.toUpperCase() + (ad.tagline ? '  ·  ' + ad.tagline : ''), w / 2, h - h * 0.085);
+    }
+
+    // the little disclosure tag every ad carries
+    g.textAlign = 'right'; g.textBaseline = 'top';
+    g.font = '700 ' + Math.round(h * 0.045) + 'px ' + LAT_FONT;
+    g.fillStyle = 'rgba(0,0,0,0.35)';
+    g.fillRect(w - h * 0.16 - pad * 0.3, pad * 0.25 + h * 0.07, h * 0.16, h * 0.065);
+    g.fillStyle = '#EDF6F3';
+    g.fillText('AD', w - pad * 0.3 - h * 0.05, pad * 0.25 + h * 0.08);
+    g.restore();
+  }
+
+  function wrap(g, text, x, y, maxW, size, col, maxLines) {
+    var words = str(text).split(/\s+/), line = '', lines = [];
+    g.font = '700 ' + size + 'px ' + LAT_FONT;
+    for (var i = 0; i < words.length; i++) {
+      var test = line ? line + ' ' + words[i] : words[i];
+      if (g.measureText(test).width > maxW && line) { lines.push(line); line = words[i]; }
+      else line = test;
+    }
+    if (line) lines.push(line);
+    if (lines.length > maxLines) {
+      lines = lines.slice(0, maxLines);
+      lines[maxLines - 1] += '…';
+    }
+    g.fillStyle = col;
+    for (var k = 0; k < lines.length; k++) g.fillText(lines[k], x, y + k * size * 1.08);
+  }
+
+  // ---------------------------------------------------------------- storage
+  function readPreview() {
+    try {
+      var raw = localStorage.getItem(PREVIEW_KEY);
+      if (!raw) return null;
+      var d = JSON.parse(raw);
+      return d && Array.isArray(d.ads) ? normalize(d.ads) : null;
+    } catch (e) { return null; }
+  }
+  function writePreview(list) {
+    try { localStorage.setItem(PREVIEW_KEY, JSON.stringify({ at: Date.now(), ads: list })); return true; }
+    catch (e) { return false; }
+  }
+  function clearPreview() {
+    try { localStorage.removeItem(PREVIEW_KEY); } catch (e) { /* ignore */ }
+  }
+
+  /* Impressions — an ad that was actually on screen on a billboard — counted
+     in THIS browser only; the game has no server. */
+  function readStats() {
+    try { return JSON.parse(localStorage.getItem(STATS_KEY) || '{}') || {}; }
+    catch (e) { return {}; }
+  }
+  function bump(id) {
+    try {
+      var s = readStats();
+      var r = s[id] || (s[id] = { imp: 0 });
+      r.imp = (r.imp || 0) + 1;
+      localStorage.setItem(STATS_KEY, JSON.stringify(s));
+    } catch (e) { /* private window */ }
+  }
+  function resetStats() {
+    try { localStorage.removeItem(STATS_KEY); } catch (e) { /* ignore */ }
+  }
+
+  /* Resolve the live list: preview → ads.json → defaults. Always calls back. */
+  function load(cb, url) {
+    var prev = readPreview();
+    if (prev) { cb(prev, 'preview'); return; }
+    var done = false;
+    function fallback() { if (!done) { done = true; cb(normalize(DEFAULTS), 'defaults'); } }
+    if (typeof fetch !== 'function' || (root.location && root.location.protocol === 'file:')) {
+      fallback(); return;
+    }
+    try {
+      fetch(url || 'ads.json', { cache: 'no-cache' })
+        .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+        .then(function (j) {
+          if (done) return;
+          var list = normalize(j);
+          done = true;
+          cb(list.length ? list : normalize(DEFAULTS), list.length ? 'ads.json' : 'defaults');
+        })
+        .catch(fallback);
+      setTimeout(fallback, 4000);
+    } catch (e) { fallback(); }
+  }
+
+  root.BLB_ADS = {
+    DEFAULTS: DEFAULTS, PLACEMENTS: PLACEMENTS, PLACEMENT_NAMES: PLACEMENT_NAMES, LAYOUTS: LAYOUTS,
+    PREVIEW_KEY: PREVIEW_KEY, STATS_KEY: STATS_KEY,
+    normalize: normalize, eligible: eligible, pick: pick, draw: draw, load: load,
+    readPreview: readPreview, writePreview: writePreview, clearPreview: clearPreview,
+    readStats: readStats, bump: bump, resetStats: resetStats, slug: slug, today: today
+  };
+})(typeof window !== 'undefined' ? window : this);
+
 /* ==== physics.js ==== */
 /* ============================================================================
  * BALLET L BA7ER — physics.js   →   window.BLB_PHYSICS
@@ -3148,6 +3478,203 @@
     return { group: g, at: { x: KX, y: FLOOR, z: KZ + 3.0 } };
   }
 
+  /* =========================================================================
+     FOOD COURTS — two clusters of stalls with plastic tables in front:
+     Souk el Akel (east, the street-food row) and Sahet el Qal3a (west, the
+     square looking at the castle). Each stall has a readable sign, a counter
+     the vendor stands behind, and one food the game sells there. Strings of
+     bulbs come on at night. One merged mesh per material per court.
+     ========================================================================= */
+  const FOOD_COURTS = [
+    {
+      id: 'souk', name: 'Souk el Akel', ar: 'سوق الأكل', sub: 'FOOD COURT · EAST',
+      cx: 42, cz: -26,
+      stalls: [
+        { id: 'manoushe', ar: 'فرن أبو فادي', sub: 'MANAKISH · ZA3TAR', prop: 'furn',
+          bg: '#3F6B3A', fg: '#EDF6F3', awn: ['PALM_GREEN', 'FOAM'] },
+        { id: 'shawarma', ar: 'شاورما زيري', sub: 'SHAWARMA · DJEJ W LA7MA', prop: 'spit',
+          bg: '#8C4A2F', fg: '#F6C445', awn: ['RUST', 'SUN'] },
+        { id: 'falafel', ar: 'فلافل المينا', sub: 'FALAFEL · SINCE FOREVER', prop: 'fryer',
+          bg: '#F2B733', fg: '#0B3A4F', awn: ['HAZARD', 'SEA_DEEP'] }
+      ]
+    },
+    {
+      id: 'qalaa', name: 'Sahet el Qal3a', ar: 'ساحة القلعة', sub: 'FOOD COURT · WEST',
+      cx: -62, cz: -26,
+      stalls: [
+        { id: 'samke', ar: 'صيّادية البحر', sub: 'SAMAK · SAYYADIYEH', prop: 'fish',
+          bg: '#16708C', fg: '#EDF6F3', awn: ['SEA_MID', 'FOAM'] },
+        { id: 'jallab', ar: 'جلّاب وعصير', sub: 'JALLAB · 3ASIR · TALJ', prop: 'jugs',
+          bg: '#0A1A33', fg: '#F2B733', awn: ['NIGHT_TOP', 'SUN'] },
+        { id: 'kaake', ar: 'كعكة صيدا', sub: 'KA3KE · BA2DOUNES', prop: 'kaake',
+          bg: '#E4D7B3', fg: '#B9502F', awn: ['TERRACOTTA', 'LIMESTONE'] }
+      ]
+    }
+  ];
+
+  function signPlane(o, w, h, x, y, z, ry, parent) {
+    const mat = new T.MeshBasicMaterial({ map: texShopSign(o), side: T.DoubleSide });
+    W.mats.push(mat);
+    const geo = new T.PlaneGeometry(w, h);
+    W.geos.push(geo);
+    const mesh = new T.Mesh(geo, mat);
+    mesh.position.set(x, y, z);
+    mesh.rotation.y = ry || 0;
+    mesh.name = 'sign';
+    parent.add(mesh);
+    return mesh;
+  }
+
+  function buildFoodCourts() {
+    const C0 = W.COL, c = new T.Color(), FLOOR = 1.5;
+    const out = [];
+    for (let ci = 0; ci < FOOD_COURTS.length; ci++) {
+      const fc = FOOD_COURTS[ci], rng = mulberry(8800 + ci * 31);
+      const m = new Mesher(), mf = new Mesher(), mg = new Mesher();
+      const g = new T.Group();
+      g.name = 'foodcourt-' + fc.id;
+      const SZ = fc.cz - 1;                       // stall centre line
+      const court = { id: fc.id, name: fc.name, ar: fc.ar, x: fc.cx, y: FLOOR, z: fc.cz + 6, stalls: [] };
+
+      // a poured slab under the whole court, so it reads as one place
+      m.box(vary(mixc(C0.LIMESTONE, C0.CEMENT, 0.4, c), rng, 0.04, c),
+        fc.cx, FLOOR + 0.02, fc.cz + 3.5, 24, 0.06, 17, 0, 0, 0, 1 / 6);
+
+      for (let si = 0; si < fc.stalls.length; si++) {
+        const st = fc.stalls[si], SX = fc.cx + (si - 1) * 7.2;
+        // plinth + three walls, open to the sea
+        m.box(vary(C0.CEMENT, rng, 0.07, c), SX, FLOOR + 0.08, SZ, 5.8, 0.16, 4.0, 0, 0, 0, 1 / 6);
+        const wall = mixc(C0.LIMESTONE, C(st.bg), 0.22, new T.Color());
+        for (let y = FLOOR + 0.15; y < FLOOR + 3.2; y += 0.5) {
+          const h = Math.min(0.5, FLOOR + 3.2 - y);
+          const parts = [[0, -1.8, 5.4, 0.36], [-2.55, 0, 0.36, 3.6], [2.55, 0, 0.36, 3.6]];
+          for (let k = 0; k < 3; k++) {
+            const b = parts[k];
+            vary(y < FLOOR + 0.9 ? mixc(C0.CEMENT, C0.STONE_DARK, 0.4, c) : wall, rng, 0.07, c);
+            m.box(c, SX + b[0], y + h * 0.5, SZ + b[1], b[2], h * 1.02, b[3], 0, 0, 0, 1 / 5);
+          }
+        }
+        // flat roof slab, a little proud of the walls
+        m.box(vary(C0.CEMENT, rng, 0.05, c), SX, FLOOR + 3.28, SZ - 0.1, 5.9, 0.18, 4.1, 0, 0, 0, 1 / 5);
+        // counter
+        m.box(vary(C0.LIMESTONE, rng, 0.05, c), SX, FLOOR + 1.02, SZ + 1.55, 5.2, 0.16, 0.85, 0, 0, 0, 1 / 5);
+        m.box(mixc(C0.CEMENT, C0.STONE_DARK, 0.3, c), SX, FLOOR + 0.5, SZ + 1.6, 5.0, 0.9, 0.6, 0, 0, 0, 1 / 6);
+        // striped awning
+        const a0 = C0[st.awn[0]], a1 = C0[st.awn[1]];
+        for (let i = 0; i < 8; i++) {
+          mf.box((i % 2 ? a1 : a0).clone(), SX - 2.45 + i * 0.7, FLOOR + 2.86, SZ + 2.2, 0.7, 0.09, 1.3, -0.24, 0, 0);
+        }
+        // the food, on and behind the counter
+        const top = FLOOR + 1.1, cz = SZ + 1.5;
+        if (st.prop === 'furn') {
+          m.prim(PRIM.dome, mixc(C0.TERRACOTTA, C0.STONE_DARK, 0.3, c), SX - 1.2, FLOOR + 0.2, SZ - 0.6, 2.4, 2.6, 2.4);
+          mf.prim(PRIM.disc || PRIM.cyl12, C0.NIGHT_TOP, SX - 1.2, FLOOR + 0.9, SZ + 0.55, 0.9, 0.6, 0.1, Math.PI / 2, 0, 0);
+          for (let k = 0; k < 5; k++) {
+            mf.prim(PRIM.cyl12, mixc(C0.PALM_GREEN, C0.LIMESTONE, 0.45, c), SX + 0.2 + (k % 3) * 0.75, top + 0.03 + ((k / 3) | 0) * 0.05, cz + ((k / 3) | 0) * 0.15, 0.62, 0.04, 0.62);
+          }
+        } else if (st.prop === 'spit') {
+          for (let k = 0; k < 2; k++) {
+            const px = SX - 1.4 + k * 1.2;
+            mf.prim(PRIM.cyl6, C0.CEMENT, px, top + 0.75, SZ + 0.9, 0.06, 1.6, 0.06);
+            mf.prim(PRIM.cone8, mixc(C0.RUST, C0.SUN, 0.25 + k * 0.2, c), px, top + 0.7, SZ + 0.9, 0.62, 1.1, 0.62, Math.PI, 0, 0);
+          }
+          mf.box(mixc(C0.CEMENT, C0.NIGHT_TOP, 0.3, c), SX - 0.8, top + 0.7, SZ + 0.35, 2.3, 1.4, 0.12);
+          for (let k = 0; k < 6; k++) {
+            mf.prim(PRIM.cyl8, mixc(C0.LIMESTONE, C0.FOAM, 0.4, c), SX + 0.9 + (k % 3) * 0.3, top + 0.06, cz - 0.1 + ((k / 3) | 0) * 0.25, 0.12, 0.12, 0.6, 0, 0.3, Math.PI / 2);
+          }
+        } else if (st.prop === 'fryer') {
+          mf.prim(PRIM.cyl12, mixc(C0.CEMENT, C0.NIGHT_TOP, 0.55, c), SX - 1.2, top + 0.22, cz - 0.1, 1.1, 0.42, 1.1);
+          mf.prim(PRIM.cyl12, mixc(C0.SUN, C0.RUST, 0.4, c), SX - 1.2, top + 0.42, cz - 0.1, 0.92, 0.04, 0.92);
+          for (let k = 0; k < 14; k++) {
+            mf.prim(PRIM.sph, mixc(C0.RUST, C0.TRUNK, 0.5 + rng() * 0.3, c), SX + 0.6 + (rng() - 0.5) * 1.1, top + 0.08 + (k > 9 ? 0.1 : 0), cz + (rng() - 0.5) * 0.4, 0.18);
+          }
+        } else if (st.prop === 'fish') {
+          m.box(mixc(C0.FOAM, C0.SEA_SHALLOW, 0.3, c), SX, top + 0.08, cz, 4.2, 0.16, 0.7);
+          for (let k = 0; k < 7; k++) {
+            mf.prim(PRIM.sph, mixc(C0.CEMENT, C0.SEA_MID, 0.3 + rng() * 0.3, c), SX - 1.8 + k * 0.6, top + 0.2, cz + (rng() - 0.5) * 0.25, 0.5, 0.14, 0.18, 0, 0.3 * (rng() - 0.5), 0);
+          }
+        } else if (st.prop === 'jugs') {
+          for (let k = 0; k < 3; k++) {
+            mf.prim(PRIM.cyl12, mixc(C0.RUST, C0.NIGHT_TOP, 0.35 + k * 0.12, c), SX - 1.6 + k * 0.8, top + 0.4, cz, 0.5, 0.8, 0.5);
+            mf.prim(PRIM.cyl8, C0.CEMENT, SX - 1.6 + k * 0.8, top + 0.84, cz, 0.3, 0.08, 0.3);
+          }
+          m.box(mixc(C0.FOAM, C0.SKY_HAZE, 0.5, c), SX + 1.3, top + 0.18, cz, 1.3, 0.36, 0.6);
+        } else if (st.prop === 'kaake') {
+          mf.prim(PRIM.cyl6, C0.TRUNK, SX + 1.6, top + 0.8, cz - 0.2, 0.08, 1.6, 0.08);
+          for (let k = 0; k < 6; k++) {
+            mf.prim(PRIM.torus, mixc(C0.SUN, C0.TRUNK, 0.35, c), SX + 1.6 + (k % 2 ? 0.22 : -0.22), top + 0.5 + k * 0.2, cz - 0.2, 0.75, 0.75, 0.75, 0, k * 0.8, Math.PI / 2);
+          }
+          for (let k = 0; k < 4; k++) {
+            mf.prim(PRIM.torus, mixc(C0.SUN, C0.TRUNK, 0.3, c), SX - 1.4 + k * 0.6, top + 0.05, cz, 0.7, 0.7, 0.7, Math.PI / 2, 0, 0);
+          }
+        }
+        signPlane({ w: 1024, h: 256, ar: st.ar, sub: st.sub, bg: st.bg, fg: st.fg,
+          border: 'rgba(237,246,243,0.6)' }, 5.0, 1.25, SX, FLOOR + 2.25, SZ + 2.05, 0, g);
+        coll(SX - 2.9, SZ - 2.0, SX + 2.9, SZ + 2.0, FLOOR + 3.37);
+        court.stalls.push({ id: st.id, ar: st.ar, x: SX, y: FLOOR, z: SZ + 2.9 });
+      }
+
+      // tables and chairs in front, a parasol on every other table
+      const PLASTIC = [C0.FOAM, C0.SEA_SHALLOW, C0.TERRACOTTA, C0.HAZARD];
+      for (let row = 0; row < 2; row++) {
+        for (let col = 0; col < 3; col++) {
+          const tx = fc.cx + (col - 1) * 6.4 + (rng() - 0.5) * 0.8;
+          const tz = fc.cz + 5.2 + row * 4.4 + (rng() - 0.5) * 0.6;
+          const pc = PLASTIC[(row * 3 + col + ci) % 4];
+          mf.prim(PRIM.cyl12, shade(pc, 0.05, c), tx, FLOOR + 0.78, tz, 1.4, 0.06, 1.4);
+          mf.prim(PRIM.cyl6, shade(pc, -0.1, c), tx, FLOOR + 0.4, tz, 0.12, 0.76, 0.12);
+          for (let k = 0; k < 4; k++) {
+            const a = k * Math.PI / 2 + rng() * 0.4;
+            chairMesher(mf, pc, tx + Math.sin(a) * 1.05, FLOOR, tz + Math.cos(a) * 1.05, a + Math.PI, 0);
+          }
+          if ((row + col) % 2 === 0) {
+            mf.prim(PRIM.cyl6, C0.CEMENT, tx, FLOOR + 1.6, tz, 0.07, 1.7, 0.07);
+            mf.prim(PRIM.cone8, (row ? C0.TERRACOTTA : C0.SEA_SHALLOW).clone(), tx, FLOOR + 2.55, tz, 3.0, 0.55, 3.0);
+          }
+          coll(tx - 0.75, tz - 0.75, tx + 0.75, tz + 0.75, FLOOR + 0.82);
+        }
+      }
+
+      // the gateway, with the court's name, and bulbs strung back to the stalls
+      const gz = fc.cz + 11.6;
+      for (let s = -1; s <= 1; s += 2) {
+        m.prim(PRIM.cyl8, vary(C0.CEMENT, rng, 0.06, c), fc.cx + s * 5.2, FLOOR + 2.2, gz, 0.26, 4.4, 0.26);
+        coll(fc.cx + s * 5.2 - 0.2, gz - 0.2, fc.cx + s * 5.2 + 0.2, gz + 0.2, FLOOR + 4.4);
+      }
+      m.box(vary(C0.CEMENT, rng, 0.05, c), fc.cx, FLOOR + 4.3, gz, 10.8, 0.16, 0.2);
+      signPlane({ w: 1024, h: 256, ar: fc.ar, sub: fc.sub, bg: '#0B3A4F', fg: '#F2B733',
+        border: 'rgba(242,183,51,0.75)' }, 7.0, 1.6, fc.cx, FLOOR + 3.4, gz + 0.05, 0, g);
+      for (let s = 0; s < 4; s++) {
+        const x0 = fc.cx + (s - 1.5) * 3.4, z0 = gz, x1 = fc.cx + (s - 1.5) * 4.4, z1 = SZ + 2.6;
+        for (let k = 1; k < 10; k++) {
+          const t = k / 10, sag = Math.sin(t * Math.PI) * 0.7;
+          mg.prim(PRIM.sph, C0.SUN, lerp(x0, x1, t), FLOOR + 4.25 - (4.25 - 3.0) * t - sag, lerp(z0, z1, t), 0.16);
+        }
+      }
+
+      g.add(bake(m, W.MAT.plaster, 'foodcourtShell-' + fc.id));
+      g.add(bake(mf, W.MAT.flat, 'foodcourtFittings-' + fc.id));
+      const glow = bake(mg, W.MAT.glowOff, 'foodcourtBulbs-' + fc.id);
+      if (glow) { W.group.remove(glow); g.add(glow); W.night.push(glow); }
+      out.push({ group: g, court: court });
+    }
+    return out;
+  }
+
+  /* Billboard sites. The game hangs the boards and paints the ads (from the
+     CMS); the world only says where they stand. `y` is the board's bottom
+     edge, `ry` its facing (0 = toward open sea), w×h its face in metres. */
+  function adSlotList() {
+    return [
+      // `base` is what the legs stand on: deck, a stall roof, the mole's top
+      { id: 'corniche-w', placement: 'corniche', x: -16, base: 1.5, y: 5.0, z: -32.2, ry: 0, w: 9, h: 4.5 },
+      { id: 'corniche-e', placement: 'corniche', x: 31, base: 1.5, y: 5.0, z: -32.6, ry: 0, w: 9, h: 4.5 },
+      { id: 'souk', placement: 'souk', x: FOOD_COURTS[0].cx, base: 4.87, y: 5.6, z: FOOD_COURTS[0].cz - 2.6, ry: 0, w: 8, h: 4 },
+      { id: 'qalaa', placement: 'qalaa', x: FOOD_COURTS[1].cx, base: 4.87, y: 5.6, z: FOOD_COURTS[1].cz - 2.6, ry: 0, w: 8, h: 4 },
+      { id: 'harbour', placement: 'harbour', x: -50, base: 2.3, y: 3.2, z: 51, ry: 2.12, w: 12, h: 6 }
+    ];
+  }
+
   function buildKioskAndCart() {
     const C0 = W.COL, rng = mulberry(7700), c = new T.Color();
     const m = new Mesher(), mg = new Mesher();
@@ -4046,6 +4573,8 @@
     const kiosk = buildKioskAndCart();
     const knefe = buildKnefe();
     group.add(knefe.group);
+    const courts = buildFoodCourts();
+    for (let i = 0; i < courts.length; i++) group.add(courts[i].group);
     buildClutter();
     const sandPiles = buildSandPiles();
     buildFisherman();
@@ -4287,6 +4816,8 @@
       timeOfDay: 0, isNight: false,
       materials: W.MAT,
       cart: W.cart,                               // the manakish/coffee cart
+      foodCourts: courts.map(function (c) { return c.court; }),   // stalls the game sells from
+      adSlots: adSlotList(),                      // where the billboards stand
       stairs: STAIR.map(function (s) { return { top: s.top, z1: s.z1, z2: s.z2, x1: -5, x2: 5 }; }),
       setLightsEnabled: function (on) { lights.visible = !!on; }
     };
@@ -4337,6 +4868,13 @@
   const PRICE = {
     'unlock:beton': 150, 'unlock:qarmid': 700, 'unlock:marble': 2400,
     mortar: 60, barrow: 300, shabeb: 450, flood: 600
+  };
+
+  /* The maker, shown in the credits. Billboard space is sold by email. */
+  const CONTACT = {
+    github: 'https://github.com/Merhii',
+    linkedin: 'https://www.linkedin.com/in/karimmerhi',
+    email: 'mmerhikarim@gmail.com'
   };
 
   /* --------------------------------------------------------------- heckles */
@@ -4445,7 +4983,7 @@
     CSS_DONE = true;
     const s = el('style');
     s.id = 'blb-hud-style';
-    s.textContent = STYLE + '\n' + STYLE2 + '\n' + STYLE3;
+    s.textContent = STYLE + '\n' + STYLE2 + '\n' + STYLE3 + '\n' + STYLE4;
     document.head.appendChild(s);
   }
 
@@ -4875,6 +5413,135 @@
 '}',
 ''].join('\n');
 
+  const STYLE4 = [
+/* --- health, buffs, hurt, faint ----------------------------------------- */
+'.blb-hp.life .fill{background:var(--blb-terra);}',
+'.blb-hp.life.low .fill{background:var(--blb-rust);animation:blb-throb 1s ease-in-out infinite;}',
+'.blb-hp .num{font-size:11px;font-weight:700;font-variant-numeric:tabular-nums;opacity:.8;}',
+'.blb-hp .heart{display:inline-block;width:10px;height:9px;margin-right:5px;vertical-align:-1px;',
+'  background:var(--blb-terra);clip-path:polygon(50% 100%,0 38%,0 12%,22% 0,50% 18%,78% 0,100% 12%,100% 38%);}',
+'@keyframes blb-throb{0%,100%{opacity:1}50%{opacity:.55}}',
+'.blb-buffs{display:flex;flex-wrap:wrap;gap:5px;}',
+'.blb-buff{padding:3px 7px 4px;font-size:10px;font-weight:700;letter-spacing:.1em;',
+'  text-transform:uppercase;background:var(--blb-ink);color:var(--blb-foam);',
+'  border:1.5px solid var(--blb-ink);font-variant-numeric:tabular-nums;}',
+'.blb-buff b{color:var(--blb-haz);font-weight:700;margin-left:4px;}',
+'.blb-hurt{position:absolute;inset:0;pointer-events:none;opacity:0;',
+'  background:radial-gradient(120% 95% at 50% 50%,rgba(185,80,47,0) 52%,rgba(140,74,47,.75) 100%);}',
+'.blb-faint{position:absolute;inset:0;display:none;place-content:center;text-align:center;',
+'  gap:10px;padding:24px;pointer-events:auto;background:rgba(10,26,51,.82);color:var(--blb-foam);}',
+'.blb-faint.on{display:grid;animation:blb-fade .6s ease-out both;}',
+'.blb-faint .ar{font-family:var(--blb-kufi);font-size:clamp(40px,10vw,84px);line-height:1.05;',
+'  color:var(--blb-haz);direction:rtl;}',
+'.blb-faint .en{font-size:clamp(18px,3.4vw,26px);font-weight:700;letter-spacing:.12em;text-transform:uppercase;}',
+'.blb-faint .tx{max-width:44ch;margin:0 auto;font-size:15px;line-height:1.45;opacity:.85;}',
+'.blb-faint .bill{margin:6px auto 0;padding:8px 14px;border:2px dashed rgba(237,246,243,.5);',
+'  font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-variant-numeric:tabular-nums;}',
+'@keyframes blb-fade{from{opacity:0}to{opacity:1}}',
+'.blb-menubtn{pointer-events:auto;width:34px;height:30px;display:grid;place-items:center;}',
+'.blb-menubtn:hover{background-color:var(--blb-haz);}',
+'.blb-menubtn i{display:block;width:14px;height:2.5px;background:var(--blb-ink);box-shadow:0 5px 0 var(--blb-ink),0 -5px 0 var(--blb-ink);}',
+
+/* --- the menu: a municipal noticeboard over the live corniche ----------- */
+'.blb-menu{position:absolute;inset:0;display:none;pointer-events:auto;overflow:hidden;',
+'  background:linear-gradient(90deg,rgba(11,58,79,.78) 0,rgba(11,58,79,.5) 38%,rgba(11,58,79,.05) 70%);}',
+'.blb-menu.on{display:block;}',
+/* the in-game HUD steps aside while a menu is up */
+'.blb.menu-open .blb-stats,.blb.menu-open .blb-tr,.blb.menu-open .blb-cross,',
+'.blb.menu-open .blb-prompt,.blb.menu-open .blb-toasts,.blb.menu-open .blb-saylayer,',
+'.blb.menu-open .blb-heckle{visibility:hidden;}',
+'.blb-menu[data-mode="pause"]{background:rgba(10,26,51,.62);}',
+'.blb-mwrap{position:absolute;inset:0;display:flex;align-items:stretch;gap:22px;',
+'  padding:max(18px,3vh) max(18px,3vw);overflow-y:auto;}',
+'.blb-mpanel{position:relative;width:min(430px,100%);flex:0 0 auto;display:flex;flex-direction:column;',
+'  padding:0 0 16px;align-self:center;animation:blb-menu-in .42s cubic-bezier(.2,1.2,.4,1) both;}',
+'@keyframes blb-menu-in{from{opacity:0;transform:translateX(-26px) rotate(-1deg)}to{opacity:1;transform:none}}',
+'.blb-mpanel .cap{height:11px;}',
+'.blb-mtitle{padding:14px 20px 0;}',
+'.blb-mtitle .ar{font-family:var(--blb-kufi);font-weight:700;direction:rtl;text-align:right;',
+'  font-size:clamp(46px,9vw,82px);line-height:1.02;color:var(--blb-ink);',
+'  text-shadow:3px 3px 0 var(--blb-haz),5px 5px 0 var(--blb-ghost);}',
+'.blb-mtitle .lat{margin-top:6px;font-weight:700;font-size:clamp(20px,3.6vw,30px);',
+'  letter-spacing:.07em;text-transform:uppercase;line-height:1;}',
+'.blb-mtitle .gl{margin-top:8px;font-size:13.5px;line-height:1.4;opacity:.82;}',
+'.blb-mtitle .gl b{background:var(--blb-haz);box-shadow:0 0 0 2px var(--blb-haz);}',
+'.blb-mpause{display:none;padding:14px 20px 0;}',
+'.blb-mpause .ar{font-family:var(--blb-kufi);font-size:40px;line-height:1;direction:rtl;text-align:right;}',
+'.blb-mpause .en{font-size:24px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;}',
+'.blb-menu[data-mode="pause"] .blb-mtitle{display:none;}',
+'.blb-menu[data-mode="pause"] .blb-mpause{display:block;}',
+'.blb-mnav{display:grid;gap:7px;padding:16px 20px 4px;}',
+'.blb-mbtn{pointer-events:auto;display:grid;grid-template-columns:30px 1fr auto;align-items:center;gap:10px;',
+'  text-align:left;padding:9px 12px 10px;background:var(--blb-paper);border:2px solid var(--blb-ink);',
+'  box-shadow:3px 3px 0 0 var(--blb-ink);transition:transform .08s,box-shadow .08s,background-color .12s;}',
+'.blb-mbtn .n{font-size:12px;font-weight:700;opacity:.55;font-variant-numeric:tabular-nums;}',
+'.blb-mbtn .l{font-size:18px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;line-height:1.05;}',
+'.blb-mbtn .s{display:block;font-size:11.5px;font-weight:500;letter-spacing:.02em;text-transform:none;opacity:.7;margin-top:2px;}',
+'.blb-mbtn .a{font-family:var(--blb-kufi);font-size:16px;direction:rtl;opacity:.75;}',
+'.blb-mbtn:hover,.blb-mbtn:focus-visible{background:var(--blb-haz);transform:translate(1px,1px);',
+'  box-shadow:2px 2px 0 0 var(--blb-ink);}',
+'.blb-mbtn.primary{background:var(--blb-haz);}',
+'.blb-mbtn.primary:hover{background:var(--blb-foam);}',
+'.blb-mbtn.warn .l{color:var(--blb-rust);}',
+'.blb-mbtn[hidden]{display:none;}',
+'.blb-mbtn[disabled]{background:var(--blb-cement);cursor:progress;opacity:.7;}',
+'.blb-msum{margin:12px 20px 0;padding:8px 0 0;border-top:2px solid var(--blb-ink);display:grid;',
+'  grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;}',
+'.blb-msum div{font-size:9.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;opacity:.75;}',
+'.blb-msum b{display:block;font-size:20px;letter-spacing:0;opacity:1;font-variant-numeric:tabular-nums;color:var(--blb-ink);}',
+'.blb-mfoot{margin:12px 20px 0;font-size:10px;letter-spacing:.1em;text-transform:uppercase;opacity:.55;line-height:1.5;}',
+'.blb-menu .blb-iload{margin:12px 20px 0;width:auto;}',
+'.blb-msheet{position:relative;flex:1 1 auto;max-width:560px;align-self:center;display:none;',
+'  padding:0 0 16px;max-height:100%;overflow-y:auto;animation:blb-menu-in .3s ease-out both;}',
+'.blb-msheet.on{display:block;}',
+'.blb-msheet .cap{height:8px;}',
+'.blb-msheet h3{display:flex;align-items:baseline;justify-content:space-between;gap:10px;',
+'  padding:12px 18px 8px;border-bottom:2px solid var(--blb-ink);font-size:20px;letter-spacing:.1em;text-transform:uppercase;}',
+'.blb-msheet h3 .ar{font-family:var(--blb-kufi);font-size:20px;letter-spacing:0;opacity:.7;}',
+'.blb-msheet .bd{padding:12px 18px 0;font-size:14px;line-height:1.45;}',
+'.blb-msheet .bd p{margin:0 0 10px;}',
+'.blb-msheet .bd h4{margin:12px 0 6px;font-size:11px;letter-spacing:.16em;text-transform:uppercase;opacity:.7;}',
+'.blb-msheet .keys{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:2px 10px;}',
+'.blb-msheet .keys div{font-size:12.5px;font-weight:600;padding:2px 0;}',
+'.blb-msheet a{pointer-events:auto;color:var(--blb-ink);font-weight:700;',
+'  text-decoration:underline;text-decoration-color:var(--blb-haz);text-decoration-thickness:3px;}',
+'.blb-msheet a:hover{background:var(--blb-haz);}',
+'.blb-links{display:flex;flex-wrap:wrap;gap:6px 18px;}',
+'.blb-mback{pointer-events:auto;margin:14px 18px 0;padding:7px 14px 8px;font-size:12px;font-weight:700;',
+'  letter-spacing:.14em;text-transform:uppercase;border:2px solid var(--blb-ink);background:var(--blb-paper);',
+'  box-shadow:2px 2px 0 var(--blb-ink);}',
+'.blb-mback:hover{background:var(--blb-haz);}',
+'.blb-set{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:6px 14px;',
+'  padding:9px 0;border-bottom:1px dashed rgba(11,58,79,.3);}',
+'.blb-set .k{font-size:14px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;}',
+'.blb-set .k small{display:block;font-size:11.5px;font-weight:500;letter-spacing:.01em;text-transform:none;opacity:.65;}',
+'.blb-set input[type=range]{pointer-events:auto;width:150px;accent-color:#0B3A4F;}',
+'.blb-set .v{font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;min-width:3.5em;text-align:right;}',
+'.blb-seg{display:inline-flex;border:2px solid var(--blb-ink);}',
+'.blb-seg button{pointer-events:auto;padding:5px 10px 6px;font-size:12px;font-weight:700;letter-spacing:.08em;',
+'  text-transform:uppercase;background:var(--blb-paper);}',
+'.blb-seg button+button{border-left:2px solid var(--blb-ink);}',
+'.blb-seg button[aria-pressed="true"]{background:var(--blb-ink);color:var(--blb-haz);}',
+'.blb-confirm{padding:12px 18px 0;}',
+'.blb-confirm p{font-size:15px;line-height:1.45;margin:0 0 12px;}',
+'.blb-confirm .row{display:flex;gap:10px;flex-wrap:wrap;}',
+'.blb-menu .blb-stamp{right:max(18px,3vw);bottom:max(18px,3vw);}',
+'.blb-menu[data-mode="pause"] .blb-stamp{display:none;}',
+'@media (max-width:760px){',
+'  .blb-mwrap{flex-direction:column;align-items:center;gap:12px;}',
+'  .blb-mpanel,.blb-msheet{align-self:stretch;width:auto;max-width:none;}',
+'  .blb-menu.sheet .blb-mpanel{display:none;}',
+'  .blb-menu{background:rgba(11,58,79,.6);}',
+'  .blb-menu .blb-stamp{display:none;}',
+'  .blb-msheet .keys{grid-template-columns:1fr;}',
+'}',
+'@media (max-height:560px){',
+'  .blb-mtitle .ar{font-size:40px;} .blb-mtitle .gl{display:none;} .blb-mnav{padding-top:10px;gap:5px;}',
+'  .blb-mbtn{padding:6px 10px 7px;} .blb-mbtn .s{display:none;}',
+'  .blb-mpanel,.blb-msheet{align-self:flex-start;}',
+'}',
+''].join('\n');
+
   /* ------------------------------------------------------------ normalizers */
   function normTiers(list) {
     const out = [];
@@ -4966,6 +5633,10 @@
     const onSelectTier = typeof opts.onSelectTier === 'function' ? opts.onSelectTier : function () {};
     const onStart = typeof opts.onStart === 'function' ? opts.onStart : function () {};
     const onToggleSound = typeof opts.onToggleSound === 'function' ? opts.onToggleSound : function () {};
+    // menu actions: continue | new | resume | quit | pause | setting(key, value)
+    const onMenu = typeof opts.onMenu === 'function' ? opts.onMenu : function (act) {
+      if (act === 'continue' || act === 'new' || act === 'resume') onStart();
+    };
 
     injectFonts();
     injectStyle();
@@ -5041,6 +5712,18 @@
     const elMm = barrow.querySelector('[data-mm]');
     stats.appendChild(barrow);
 
+    // health — the sea, a fall or an empty stomach take it; food gives it back
+    const life = el('div', 'blb-plaque blb-hp life');
+    life.innerHTML =
+      '<div class="top"><span class="k"><i class="heart"></i>Health</span>' +
+        '<span class="num" data-lifev>100</span>' +
+        '<span class="ar blb-ar">الصحّة</span></div>' +
+      '<div class="track"><div class="fill" data-lifefill></div>' +
+        '<div class="pips"><i></i><i></i><i></i><i></i><i></i></div></div>';
+    const elLifeFill = life.querySelector('[data-lifefill]');
+    const elLifeV = life.querySelector('[data-lifev]');
+    stats.appendChild(life);
+
     // stamina — the thing knefe buys back
     const hp = el('div', 'blb-plaque blb-hp');
     hp.innerHTML =
@@ -5065,6 +5748,42 @@
     const elWorkers = row.querySelector('[data-workers]');
     if (simple) elWorkers.parentNode.style.display = 'none';
     stats.appendChild(row);
+
+    // what you ate recently and what it is still doing for you
+    const buffs = el('div', 'blb-buffs');
+    stats.appendChild(buffs);
+    let buffKey = '';
+    function setBuffs(list) {
+      list = list || [];
+      const key = list.map(function (b) { return b.id + ':' + Math.ceil(b.t); }).join('|');
+      if (key === buffKey) return;
+      buffKey = key;
+      buffs.innerHTML = list.map(function (b) {
+        return '<span class="blb-buff">' + esc(b.label) + '<b>' + Math.ceil(b.t) + 's</b></span>';
+      }).join('');
+    }
+
+    // red edge when something hurts
+    const hurtEl = el('div', 'blb-hurt');
+    let hurtA = 0;
+    function hurt(amount) {
+      hurtA = clamp(hurtA + 0.25 + num(amount, 5) * 0.04, 0, 0.95);
+    }
+
+    // passing out: a full-screen card while the game moves you to safety
+    const faint = el('div', 'blb-faint');
+    faint.innerHTML = '<div class="ar">غمي عليك</div><div class="en">Ghme 3alék</div>' +
+      '<div class="tx" data-ftx></div><div class="bill" data-fbill></div>';
+    const elFaintTx = faint.querySelector('[data-ftx]');
+    const elFaintBill = faint.querySelector('[data-fbill]');
+    function showFaint(o) {
+      o = o || {};
+      elFaintTx.textContent = o.text || '';
+      elFaintBill.textContent = o.bill || '';
+      elFaintBill.style.display = o.bill ? 'block' : 'none';
+      faint.classList.add('on');
+    }
+    function hideFaint() { faint.classList.remove('on'); }
 
     // sea state
     const sea = el('div', 'blb-plaque blb-sea');
@@ -5104,8 +5823,14 @@
         'stroke-width="2.1" stroke-linecap="round"><path d="M4 9h3l5-4v14l-5-4H4z" ' +
         'fill="currentColor" stroke="none"/><path d="M16 9l6 6M22 9l-6 6"/></svg>';
     snd.addEventListener('click', function () { toggleSound(); });
+    const menuBtn = el('button', 'blb-plaque blb-menubtn', '<i></i>');
+    menuBtn.type = 'button';
+    menuBtn.title = 'Menu (Esc)';
+    menuBtn.setAttribute('aria-label', 'Pause menu');
+    menuBtn.addEventListener('click', function () { onMenu('pause'); });
     tr.appendChild(phaseTag);
     tr.appendChild(snd);
+    tr.appendChild(menuBtn);
     r.appendChild(tr);
 
     function toggleSound(force) {
@@ -5345,56 +6070,236 @@
     intro.setAttribute('aria-modal', 'true');
     intro.setAttribute('aria-label', 'Ballet l Ba7er, start');
     const K = function (k) { return '<kbd class="blb-kbd">' + k + '</kbd>'; };
+    /* The menu sits over the live scene (the game flies the camera along the
+       corniche behind it), so it is a panel, not a full-bleed poster. Main
+       mode: continue / new / how to play / settings / credits. Pause mode:
+       resume / how to play / settings / save & quit. */
+    intro.className = 'blb-menu';
+    intro.setAttribute('data-mode', 'main');
+    const MB = function (act, n, l, s, a, cls) {
+      return '<button class="blb-mbtn' + (cls ? ' ' + cls : '') + '" type="button" data-act="' + act + '">' +
+        '<span class="n">' + n + '</span><span class="l">' + l + '<span class="s">' + s + '</span></span>' +
+        '<span class="a">' + a + '</span></button>';
+    };
     intro.innerHTML =
-      '<div class="blb-ipaper">' +
-        '<div class="blb-iband blb-haz"></div>' +
-        '<div class="blb-iband b2 blb-haz"></div>' +
-        '<div class="blb-ititle">' +
-          '<div class="ar">بلّط البحر</div>' +
-          '<div class="lat">Ballet l Ba7er</div>' +
+      '<div class="blb-mwrap">' +
+        '<div class="blb-plaque blb-mpanel">' +
+          '<div class="cap blb-haz"></div>' +
+          '<div class="blb-mtitle">' +
+            '<div class="ar">بلّط البحر</div>' +
+            '<div class="lat blb-print">Ballet l Ba7er</div>' +
+            '<p class="gl">Lebanese, said to end an argument: <b>go tile the sea.</b> ' +
+              'Fine. We brought mortar.</p>' +
+          '</div>' +
+          '<div class="blb-mpause"><div class="ar">استراحة</div><div class="en">Este2a7a — paused</div></div>' +
+          '<nav class="blb-mnav">' +
+            MB('continue', '01', 'Kammel', 'continue your stretch of sea', 'كمّل', 'primary') +
+            MB('resume', '01', 'Resume', 'back to the balat', 'رجوع', 'primary') +
+            MB('new', '02', 'Balle4 men jdid', 'new game — a fresh, untiled sea', 'جديد') +
+            MB('howto', '03', 'Kif bteshtghel', 'how to play', 'كيف') +
+            MB('settings', '04', 'E3dadat', 'settings', 'إعدادات') +
+            MB('credits', '05', 'Credits', 'who is to blame', 'مين') +
+            MB('quit', '05', 'Save & quit', 'back to the main menu', 'خروج', 'warn') +
+          '</nav>' +
+          '<div class="blb-msum" data-sum></div>' +
+          '<div class="blb-iload" data-iload style="display:none">' +
+            '<div class="bar"><div class="fil blb-haz"></div></div>' +
+            '<div class="tx">Mixing the mouna 0%</div>' +
+          '</div>' +
+          '<p class="blb-mfoot">Directorate of Pointless Works, Saida sub-office. ' +
+            'Permit 1991/B. Nothing in this project is load-bearing.</p>' +
         '</div>' +
-        '<p class="blb-igloss">Lebanese, said to end an argument or a hopeless errand: ' +
-          '<b>go tile the sea.</b> Fine. We brought mortar.</p>' +
-        '<p class="blb-ipitch">Saida corniche. Two-metre slabs, laid straight out over ' +
-          'the Mediterranean. You aim down the middle of the screen, so look where the balata goes. ' +
-          'Every night the waves take your edges back. Every morning you lay more.</p>' +
-        '<div class="blb-ikeys">' +
-          '<div>' + K('WASD') + '<span>walk the corniche</span></div>' +
-          '<div>' + K('CLICK') + '<span>ballet: lay a balata</span></div>' +
-          '<div>' + K('SHIFT') + '<span>run</span></div>' +
-          '<div>' + K('HOLD CLICK') + '<span>sweep to lay a whole row</span></div>' +
-          '<div>' + K('SPACE') + '<span>jump</span></div>' +
-          '<div>' + K('HOLD E') + '<span>shovel mouna at a pile</span></div>' +
-          '<div>' + K('E') + '<span>talk to whoever is beside you</span></div>' +
-          '<div>' + K('MOUSE') + '<span>look around (click once to capture it)</span></div>' +
-          '<div>' + K('[') + K(']') + '<span>mouse sensitivity</span></div>' +
-          '<div>' + K('V') + '<span>first / third person</span></div>' +
-          '<div>' + K('SCROLL') + '<span>zoom</span></div>' +
-          '<div>' + K('M') + '<span>sound on and off</span></div>' +
-        '</div>' +
-        '<div class="blb-iload" data-iload style="display:none">' +
-          '<div class="bar"><div class="fil blb-haz"></div></div>' +
-          '<div class="tx">Mixing the mouna 0%</div>' +
-        '</div>' +
-        '<button class="blb-istart" type="button" data-start>Yalla' +
-          '<span class="ar">ابدأ</span></button>' +
-        '<p class="blb-ifoot">Issued by the Directorate of Pointless Works, Saida ' +
-          'sub-office. Permit 1991/B. Nothing in this project is load-bearing.</p>' +
-        '<div class="blb-stamp" aria-hidden="true">' +
-          '<div class="a">مجلس<br>بلاط البحر</div>' +
-          '<div class="b">Pointless<br>works</div>' +
-          '<div class="c">1991/B</div>' +
-        '</div>' +
+        '<div class="blb-plaque blb-msheet" data-sheet></div>' +
+      '</div>' +
+      '<div class="blb-stamp" aria-hidden="true">' +
+        '<div class="a">مجلس<br>بلاط البحر</div>' +
+        '<div class="b">Pointless<br>works</div>' +
+        '<div class="c">1991/B</div>' +
       '</div>';
-    const btnStart = intro.querySelector('[data-start]');
+    const btnStart = intro.querySelector('[data-act="continue"]');
     const introLoad = intro.querySelector('[data-iload]');
     const introLoadFil = introLoad.querySelector('.fil');
     const introLoadTx = introLoad.querySelector('.tx');
-    btnStart.addEventListener('click', function () {
-      if (btnStart.disabled) return;
-      hideIntro();
-      onStart();
+    const sheet = intro.querySelector('[data-sheet]');
+    const elSum = intro.querySelector('[data-sum]');
+    const menuBtns = {};
+    ['continue', 'resume', 'new', 'howto', 'settings', 'credits', 'quit'].forEach(function (a) {
+      menuBtns[a] = intro.querySelector('[data-act="' + a + '"]');
     });
+    let menuState = { mode: 'main', hasSave: false, summary: null, settings: {} };
+    let sheetName = '';
+
+    function openSheet(name) {
+      sheetName = name;
+      intro.classList.toggle('sheet', !!name);
+      if (!name) { sheet.classList.remove('on'); sheet.innerHTML = ''; return; }
+      const back = '<button class="blb-mback" type="button" data-back>← Back</button>';
+      let html = '<div class="cap blb-haz"></div>';
+      if (name === 'howto') {
+        html += '<h3>How to play <span class="ar">كيف بتشتغل</span></h3><div class="bd">' +
+          '<p>Shovel <b>mouna</b> from a pile on the corniche, walk down the stairs, and lay ' +
+          '<b>balat</b> out over the sea. Interior tiles are safe forever; the frontier is ' +
+          'where the sea fights back. The municipality pays rent on every m² still standing.</p>' +
+          '<h4>Health & stamina</h4>' +
+          '<p><b>Stamina</b> drains as you work, run and swim. <b>Health</b> is what the sea, ' +
+          'a bad fall or an empty stomach take: waves breaking over the frontier slap you, ' +
+          'cold water chills you, and swimming with no stamina left is drowning. Hit zero ' +
+          'and you pass out — someone drags you to the hospital, and the hospital sends a bill.</p>' +
+          '<h4>Eating</h4>' +
+          '<p>Two <b>food courts</b> on the corniche — Souk el Akel to the east, Sahet el Qal3a ' +
+          'by the castle — plus Knefe Jardali. Walk up to a counter and press ' + K('E') + '. ' +
+          'Cheap food is stamina, real food is health, and some of it keeps working for a while.</p>' +
+          '<h4>Controls</h4><div class="keys">' +
+          '<div>' + K('WASD') + ' walk</div><div>' + K('SHIFT') + ' run</div>' +
+          '<div>' + K('SPACE') + ' jump</div><div>' + K('CLICK') + ' lay a balata</div>' +
+          '<div>' + K('HOLD CLICK') + ' lay a row</div><div>' + K('HOLD E') + ' shovel mouna</div>' +
+          '<div>' + K('E') + ' talk / buy food</div><div>' + K('V') + ' first / third person</div>' +
+          '<div>' + K('[') + K(']') + ' mouse sensitivity</div><div>' + K('M') + ' sound</div>' +
+          '<div>' + K('ESC') + ' pause menu</div><div>' + K('SCROLL') + ' zoom</div>' +
+          '</div></div>' + back;
+      } else if (name === 'settings') {
+        const st = menuState.settings || {};
+        const seg = function (key, opts2, cur) {
+          return '<div class="blb-seg">' + opts2.map(function (o) {
+            return '<button type="button" data-set="' + key + '" data-val="' + o[0] + '" aria-pressed="' +
+              (String(cur) === String(o[0]) ? 'true' : 'false') + '">' + o[1] + '</button>';
+          }).join('') + '</div>';
+        };
+        html += '<h3>Settings <span class="ar">إعدادات</span></h3><div class="bd">' +
+          '<div class="blb-set"><div class="k">Sound<small>sea, gulls, voices</small></div>' +
+            seg('sound', [['on', 'On'], ['off', 'Off']], st.sound === false ? 'off' : 'on') + '</div>' +
+          '<div class="blb-set"><div class="k">Mouse sensitivity<small>also [ and ] in game</small></div>' +
+            '<div><input type="range" min="0.3" max="3" step="0.05" data-range="sens" value="' +
+            num(st.sens, 1) + '"> <span class="v" data-rv="sens">' + num(st.sens, 1).toFixed(2) + '×</span></div></div>' +
+          '<div class="blb-set"><div class="k">Field of view<small>wider sees more sea</small></div>' +
+            '<div><input type="range" min="45" max="80" step="1" data-range="fov" value="' +
+            num(st.fov, 58) + '"> <span class="v" data-rv="fov">' + Math.round(num(st.fov, 58)) + '°</span></div></div>' +
+          '<div class="blb-set"><div class="k">Camera<small>V switches in game</small></div>' +
+            seg('view', [['first', 'First'], ['third', 'Third']], st.view || 'first') + '</div>' +
+          '<div class="blb-set"><div class="k">Head bob<small>walking sway in first person</small></div>' +
+            seg('bob', [['on', 'On'], ['off', 'Off']], st.bob === false ? 'off' : 'on') + '</div>' +
+          '</div>' + back;
+      } else if (name === 'credits') {
+        html += '<h3>Credits <span class="ar">مين</span></h3><div class="bd">' +
+          '<p>A game of the Lebanese saying <i>ballet l ba7er</i>. Set on the Saida corniche, ' +
+          'with Qalaat al-Bahr on its causeway and Jazirat Ziri on the horizon.</p>' +
+          '<p>Every mesh, texture and sound is generated at runtime. Three.js r128 (MIT).</p>' +
+          '<h4>Made by</h4><p class="blb-links">' +
+            '<a href="' + CONTACT.github + '" target="_blank" rel="noopener">GitHub · ' +
+              esc(CONTACT.github.replace(/^https?:\/\//, '')) + '</a>' +
+            (CONTACT.linkedin ? '<a href="' + CONTACT.linkedin + '" target="_blank" rel="noopener">LinkedIn · ' +
+              esc(CONTACT.linkedin.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')) + '</a>' : '') +
+          '</p>' +
+          '<h4>Your ad on the corniche</h4>' +
+          '<p>Want your brand on the billboards along the corniche, the food-court roofs or the ' +
+            'harbour mole? Email <a href="mailto:' + CONTACT.email + '?subject=' +
+            encodeURIComponent('Billboard on Ballet l Ba7er') + '">' + CONTACT.email + '</a>.</p>' +
+          '<p>The sponsors on the billboards right now are invented. ' +
+          'The sea does not issue receipts.</p></div>' + back;
+      } else if (name === 'confirm-new') {
+        html += '<h3>Start over? <span class="ar">من جديد؟</span></h3><div class="blb-confirm">' +
+          '<p>This throws away your saved sea — every balata, every lira. The sea will ' +
+          'not notice. You might.</p><div class="row">' +
+          '<button class="blb-mbtn primary" type="button" data-act2="new"><span class="n">!</span>' +
+            '<span class="l">Yes, from scratch<span class="s">wipe the save</span></span><span class="a">إيه</span></button>' +
+          '<button class="blb-mbtn" type="button" data-back><span class="n">←</span>' +
+            '<span class="l">No, keep it<span class="s">back to the menu</span></span><span class="a">لأ</span></button>' +
+          '</div></div>';
+      }
+      sheet.innerHTML = html;
+      sheet.classList.add('on');
+      const first = sheet.querySelector('button,input');
+      try { if (first) first.focus(); } catch (e) {}
+    }
+
+    sheet.addEventListener('click', function (e) {
+      const t = e.target.closest ? e.target.closest('button') : null;
+      if (!t) return;
+      if (t.hasAttribute('data-back')) { openSheet(''); focusFirst(); return; }
+      if (t.getAttribute('data-act2') === 'new') { openSheet(''); onMenu('new'); return; }
+      const key = t.getAttribute('data-set');
+      if (key) {
+        const val = t.getAttribute('data-val');
+        Array.prototype.forEach.call(sheet.querySelectorAll('[data-set="' + key + '"]'), function (b) {
+          b.setAttribute('aria-pressed', b === t ? 'true' : 'false');
+        });
+        const v = (val === 'on') ? true : (val === 'off' ? false : val);
+        menuState.settings[key] = v;
+        onMenu('setting', { key: key, value: v });
+      }
+    });
+    sheet.addEventListener('input', function (e) {
+      const key = e.target.getAttribute && e.target.getAttribute('data-range');
+      if (!key) return;
+      const v = parseFloat(e.target.value);
+      menuState.settings[key] = v;
+      const out = sheet.querySelector('[data-rv="' + key + '"]');
+      if (out) out.textContent = key === 'fov' ? Math.round(v) + '°' : v.toFixed(2) + '×';
+      onMenu('setting', { key: key, value: v });
+    });
+
+    intro.querySelector('.blb-mnav').addEventListener('click', function (e) {
+      const b = e.target.closest ? e.target.closest('[data-act]') : null;
+      if (!b || b.disabled) return;
+      const act = b.getAttribute('data-act');
+      if (act === 'howto' || act === 'settings' || act === 'credits') {
+        openSheet(sheetName === act ? '' : act);
+        return;
+      }
+      if (act === 'new' && menuState.hasSave) { openSheet('confirm-new'); return; }
+      openSheet('');
+      onMenu(act);
+    });
+
+    function focusFirst() {
+      const b = intro.querySelector('.blb-mnav .blb-mbtn:not([hidden])');
+      try { if (b) b.focus(); } catch (e) {}
+    }
+
+    function paintMenu() {
+      const m = menuState.mode === 'pause' ? 'pause' : 'main';
+      intro.setAttribute('data-mode', m);
+      menuBtns['continue'].hidden = m !== 'main';
+      menuBtns.resume.hidden = m !== 'pause';
+      menuBtns['new'].hidden = m !== 'main';
+      menuBtns.credits.hidden = m !== 'main';
+      menuBtns.quit.hidden = m !== 'pause';
+      const cont = menuBtns['continue'];
+      cont.querySelector('.l').firstChild.textContent = menuState.hasSave ? 'Kammel' : 'Yalla';
+      cont.querySelector('.s').textContent = menuState.hasSave
+        ? 'continue your stretch of sea' : 'start tiling the sea';
+      cont.querySelector('.a').textContent = menuState.hasSave ? 'كمّل' : 'ابدأ';
+      // "new game" is only worth showing when there is something to throw away
+      if (!menuState.hasSave) menuBtns['new'].hidden = true;
+      const s = menuState.summary;
+      if (s && (s.tiles || s.lira || s.laid)) {
+        elSum.style.display = '';
+        elSum.innerHTML = '<div><b>' + fmt(s.metres || 0) + '</b>m² standing</div>' +
+          '<div><b>' + fmt(s.laid || 0) + '</b>balat laid</div>' +
+          '<div><b>' + fmt(s.lira || 0) + '</b>lira</div>';
+      } else {
+        elSum.style.display = 'none';
+      }
+    }
+
+    function showMenu(o) {
+      o = o || {};
+      menuState = {
+        mode: o.mode || menuState.mode || 'main',
+        hasSave: o.hasSave != null ? !!o.hasSave : menuState.hasSave,
+        summary: o.summary !== undefined ? o.summary : menuState.summary,
+        settings: Object.assign({}, menuState.settings, o.settings || {})
+      };
+      openSheet('');
+      paintMenu();
+      intro.classList.add('on');
+      r.classList.add('menu-open');
+      introOpen = true;
+      focusFirst();
+    }
+    paintMenu();
+    r.appendChild(hurtEl);
+    r.appendChild(faint);
     r.appendChild(intro);
 
     /* ================================================================== api */
@@ -5414,6 +6319,14 @@
         elHpFill.style.transform = 'scaleX(' + frac.toFixed(3) + ')';
         hp.classList.toggle('low', frac <= 0.25 && frac > 0);
         hp.classList.toggle('out', frac <= 0);
+      }
+      if (s.hpMax != null) S.hpMax = Math.max(1, num(s.hpMax, S.hpMax));
+      if (s.hp != null) {
+        S.hp = clamp(num(s.hp, S.hp), 0, S.hpMax || 100);
+        const lf = S.hp / (S.hpMax || 100);
+        elLifeFill.style.transform = 'scaleX(' + lf.toFixed(3) + ')';
+        elLifeV.textContent = Math.ceil(S.hp) + ' / ' + Math.round(S.hpMax || 100);
+        life.classList.toggle('low', lf <= 0.3);
       }
       if (s.unlocked != null) S.unlocked = normUnlocked(s.unlocked, tiers.length);
       if (s.tierIdx != null) S.tierIdx = clamp(num(s.tierIdx, S.tierIdx) | 0, 0, tiers.length - 1);
@@ -5597,13 +6510,11 @@
       shopOpen = false;
     }
 
-    function showIntro() {
-      intro.classList.add('on');
-      introOpen = true;
-      try { btnStart.focus(); } catch (e) {}
-    }
+    function showIntro() { showMenu({ mode: 'main' }); }
     function hideIntro() {
       intro.classList.remove('on');
+      intro.classList.remove('sheet');
+      r.classList.remove('menu-open');
       introOpen = false;
     }
 
@@ -5613,7 +6524,6 @@
         load.classList.remove('on');
         introLoad.style.display = 'none';
         btnStart.disabled = false;
-        btnStart.innerHTML = 'Yalla<span class="ar">ابدأ</span>';
         return;
       }
       loadPct = clamp(num(pct, 0), 0, 100);
@@ -5625,8 +6535,6 @@
       introLoadTx.textContent = 'Mixing the mouna ' + Math.round(loadPct) + '%';
       const ready = loadPct >= 99.5;
       btnStart.disabled = !ready;
-      if (!ready) btnStart.innerHTML = 'Mixing…';
-      else btnStart.innerHTML = 'Yalla<span class="ar">ابدأ</span>';
     }
 
     function setReticle(state) {
@@ -5637,6 +6545,10 @@
     /* ---------------------------------------------------------- frame ticker */
     function frame(dt) {
       tickSpeech(dt);
+      if (hurtA > 0.001) {
+        hurtA = Math.max(0, hurtA - num(dt, 0.016) * 1.6);
+        hurtEl.style.opacity = hurtA.toFixed(3);
+      } else if (hurtA !== 0) { hurtA = 0; hurtEl.style.opacity = '0'; }
       dt = num(dt, 0.016);
       if (dt > 1) dt /= 1000;          // tolerate milliseconds
       dt = clamp(dt, 0, 0.1);
@@ -5738,6 +6650,15 @@
       closeShop: closeShop,
       showIntro: showIntro,
       hideIntro: hideIntro,
+      showMenu: showMenu,
+      hideMenu: hideIntro,
+      isMenuOpen: function () { return introOpen; },
+      menuMode: function () { return introOpen ? menuState.mode : null; },
+      closeSheet: function () { if (sheetName) { openSheet(''); focusFirst(); return true; } return false; },
+      setBuffs: setBuffs,
+      hurt: hurt,
+      showFaint: showFaint,
+      hideFaint: hideFaint,
       setLoading: setLoading,
       frame: frame,
       // extras, all optional for the orchestrator
@@ -6103,6 +7024,20 @@
       }
     }
 
+    // a dull thump with a falling pitch: the sea, or the ground, landing on you
+    function hurt() {
+      const c = ensure(); if (busy()) return;
+      const t = c.currentTime + 0.001;
+      const o = ctx.createOscillator();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(150, t);
+      o.frequency.exponentialRampToValueAtTime(52, t + 0.22);
+      const g = envGain(t, 0.32, 0.004, 0.26);
+      o.connect(g); g.connect(master);
+      o.start(t);
+      track(o, t + 0.3);
+    }
+
     /* --------------------------------------------------------------- the sea */
     function wash(level) {
       const c = ensure(); if (!c) return;
@@ -6118,7 +7053,7 @@
 
     const sfx = {
       clack: clack, pour: pour, crumble: crumble, splash: splash,
-      gull: gull, ui: ui, purchase: purchase, wash: wash, say: voiceBlip,
+      gull: gull, ui: ui, purchase: purchase, hurt: hurt, wash: wash, say: voiceBlip,
       unlock: function () {
         const c = ensure();
         if (!c) return;
@@ -6197,6 +7132,77 @@
   var SOAK_HIT = 7;           // one-off, the moment the sea gets you
   var KNEFE_PRICE = 25;
   var KNEFE_HEAL = 45;
+
+  /* Health is separate from stamina: stamina is how much work is left in you,
+     health is what the sea, a fall or an empty stomach take. At zero you pass
+     out and wake on the corniche with a hospital bill. */
+  var HP_MAX = 100;
+  var HP_COLD = 0.35;          // per second in November water
+  var HP_DROWN = 6.5;          // per second in water with no stamina left
+  var HP_STARVE = 0.6;         // per second on land with no stamina left
+  var HP_REGEN = 0.35;         // per second while well rested
+  var FALL_SAFE = 11;          // landing speed (m/s) you walk away from
+  var RESPAWN_HP = 60;
+
+  /* What the food courts sell. `sta` is stamina, `hp` health, `buff` keeps
+     working after you eat. Knefe stays at Jardali's. */
+  var FOODS = {
+    knefe:    { name: 'Knefe b jebne',   ar: 'كنافة',   price: KNEFE_PRICE, sta: KNEFE_HEAL, hp: 10 },
+    manoushe: { name: 'Manoushe za3tar', ar: 'منقوشة',  price: 8,  sta: 18, hp: 4 },
+    falafel:  { name: 'Falafel sandwich', ar: 'فلافل',  price: 12, sta: 24, hp: 10 },
+    shawarma: { name: 'Shawarma',        ar: 'شاورما',  price: 30, sta: 35, hp: 22,
+                buff: { id: 'shab3an', label: 'Shab3an · heals', t: 60 } },
+    samke:    { name: 'Sayyadiyeh',      ar: 'صيّادية', price: 40, sta: 25, hp: 45 },
+    jallab:   { name: 'Jallab',          ar: 'جلّاب',   price: 6,  sta: 10, hp: 0,
+                buff: { id: 'barid', label: 'Jallab · cool', t: 90 } },
+    kaake:    { name: 'Ka3ke',           ar: 'كعكة',    price: 5,  sta: 12, hp: 2 }
+  };
+
+  /* The people behind the food-court counters, keyed by what they sell. */
+  var VENDORS = {
+    manoushe: { name: 'Abou Fadi', voice: 1, hat: 'cap', shirt: 0xe8e2d4, hatCol: 0x3f6b3a, lines: {
+      greet: [{ t: 'Manoushe? Lessa tal3a mn el furn.', ar: 'طالعة من الفرن' }],
+      idle: [{ t: 'Za3tar men el jabal. Zét men el day3a.', ar: 'زعتر من الجبل' },
+             { t: 'Kol, ba3dén ballet. Hék el tartib.', ar: 'هيك الترتيب' }],
+      sold: [{ t: 'Sa7tein. Ma fi a7la.', ar: 'صحتين' }, { t: 'Hay ma3 khyar w na3na3.', ar: 'خيار ونعنع' }],
+      pricey: [{ t: 'Tmen lira. Ballet shwayy w rja3.', ar: 'تمن ليرات' }],
+      full: [{ t: 'Inta mesh ja3an. Ana ba3ref.', ar: 'مش جوعان' }] } },
+    shawarma: { name: 'Ziad', voice: 2, hat: 'cap', shirt: 0xb9502f, hatCol: 0x8c4a2f, lines: {
+      greet: [{ t: 'Djej aw la7me? Fi toum ktir.', ar: 'دجاج أو لحمة؟' }],
+      idle: [{ t: 'El sikh 3am ydour men el sob7.', ar: 'السيخ عم يدور' },
+             { t: 'Ma bta3ref tballet 3a ma3de faadye.', ar: 'معدة فاضية' }],
+      sold: [{ t: 'Hay. Btedfik sa3a.', ar: 'بتدفّيك ساعة' }, { t: 'Toum ziyéde, ma 2ellak la 7ada.', ar: 'توم زيادة' }],
+      pricey: [{ t: 'Tlétin lira ya 3ammi. Mesh balash.', ar: 'تلاتين ليرة' }],
+      full: [{ t: 'Wa2ef, wa2ef. Kelt ktir.', ar: 'كلت كتير' }] } },
+    falafel: { name: 'Im Rami', voice: 3, hat: 'scarf', shirt: 0x3b5c73, hatCol: 0xf2b733, lines: {
+      greet: [{ t: 'Falafel skhoun, ya habibi.', ar: 'فلافل سخنة' }],
+      idle: [{ t: 'Tarator men 3ende. El wasfe sirr.', ar: 'الوصفة سر' },
+             { t: 'Ibni kamén kén ballet. Halla2 bi Dubai.', ar: 'هلّق بدبي' }],
+      sold: [{ t: 'Sa7tein 3a 2albak.', ar: 'صحتين على قلبك' }, { t: 'Zedtellak wa7de. Ma t2oul.', ar: 'زدتلّك وحدة' }],
+      pricey: [{ t: 'Tna3sh lira. Ta3a ba3dén.', ar: 'تنعش ليرة' }],
+      full: [{ t: 'Shab3an? Mnih. Rou7 shtghol.', ar: 'شبعان؟' }] } },
+    samke: { name: 'Abou Hassan', voice: 0, hat: 'none', shirt: 0x16708c, hatCol: 0x2b2420, lines: {
+      greet: [{ t: 'Samak el yom. Wallah el yom.', ar: 'سمك اليوم' }],
+      idle: [{ t: 'Sayyadiyeh b ruz w basal. Mitl ayyém zamén.', ar: 'متل أيام زمان' },
+             { t: 'El ba7er bya3tik samak. W byekhod balat. 3adel.', ar: 'عادل' }],
+      sold: [{ t: 'Kol. Hay bterja3lak el rou7.', ar: 'بترجعلك الروح' }],
+      pricey: [{ t: 'Arb3in lira. El samak ghali hal sene.', ar: 'السمك غالي' }],
+      full: [{ t: 'Ma fi 3a2el ykoun shab3an w ja3an.', ar: 'شبعان' }] } },
+    jallab: { name: 'Hamoudi', voice: 4, hat: 'cap', shirt: 0xf2b733, hatCol: 0x0b3a4f, lines: {
+      greet: [{ t: 'Jallab b talj w snawbar!', ar: 'جلّاب بتلج' }],
+      idle: [{ t: 'Bel shob, jallab. Bel bard, kamén jallab.', ar: 'كمان جلّاب' },
+             { t: 'Ana 3am bkhabbi el talj men el shames.', ar: 'عم خبّي التلج' }],
+      sold: [{ t: 'Barid! Hayda ybarridak sa3a w nos.', ar: 'بيبرّدك' }],
+      pricey: [{ t: 'Sett lira bas. Ma 3andak sett lira?', ar: 'ست ليرات' }],
+      full: [{ t: 'Khalas, ma3dtak meliye.', ar: 'معدتك مليانة' }] } },
+    kaake: { name: 'Abou Khaled', voice: 1, hat: 'hard', shirt: 0xe4d7b3, hatCol: 0xb9502f, lines: {
+      greet: [{ t: 'Ka3ke! Ka3ke b za3tar!', ar: 'كعكة!' }],
+      idle: [{ t: 'Sar-li tlétin sene b2ool "ka3ke". Wala marra ghayyart.', ar: 'تلاتين سنة' },
+             { t: 'El ka3ke ma btekhla2 bala ba7er.', ar: 'بلا بحر' }],
+      sold: [{ t: 'Khod. W hay za3tar 3a jamb.', ar: 'زعتر ع جنب' }],
+      pricey: [{ t: 'Khams lira. Iza ma ma3ak, ballet.', ar: 'خمس ليرات' }],
+      full: [{ t: 'Khodha ma3ak la ba3dén. La2, mesh balash.', ar: 'مش ببلاش' }] } }
+  };
   var PAY_PER_BALATA = 3;     // the more you tile, the more you make
   var PAY_PER_SURVIVING = 1;  // and the inspection pays rent on what holds
 
@@ -6598,14 +7604,33 @@
     var fx = BLB_PHYSICS.createSplashes(THREE, { palette: P });
     scene.add(fx.object);
 
+    // ---- settings, kept per browser
+    var SET = { sound: true, sens: 1, fov: 58, view: 'first', bob: true };
+    try {
+      var rawSet = JSON.parse(localStorage.getItem('blb.settings') || 'null');
+      if (rawSet) {
+        for (var sk in SET) { if (rawSet.hasOwnProperty(sk)) SET[sk] = rawSet[sk]; }
+      } else {
+        var oldSens = parseFloat(localStorage.getItem('blb.sens'));
+        if (oldSens > 0.0004 && oldSens < 0.02) SET.sens = oldSens / 0.0022;
+      }
+    } catch (e) { /* private window */ }
+    function saveSettings() {
+      try { localStorage.setItem('blb.settings', JSON.stringify(SET)); } catch (e) { /* ignore */ }
+    }
+
     var hud = BLB_HUD.create({
       root: overlay, palette: PCSS, tiers: HUD_TIERS, simple: true,
       onSelectTier: function () {},
       onStart: function () { start(); },
-      onToggleSound: function (on) { sfx.muted = !on; },
+      // the HUD's speaker button reports `muted`
+      onToggleSound: function (muted) { sfx.muted = !!muted; SET.sound = !muted; saveSettings(); },
+      onMenu: function (act, v) { onMenu(act, v); },
       keys: false
     });
     var sfx = BLB_HUD.createAudio();
+    sfx.muted = !SET.sound;
+    if (hud.setMuted) hud.setMuted(!SET.sound);
 
     // ---- player
     var mason = createMason(P.SHIRT, P.HAZARD);
@@ -6618,6 +7643,7 @@
     var S = {
       mortar: 6, mortarMax: MORTAR_MAX,
       health: HEALTH_MAX, lira: 0, knefeEaten: 0,
+      hp: HP_MAX, buffs: {}, fainted: 0, faintCause: '', faints: 0,
       elapsed: 0, started: false, laid: 0, lost: 0,
       nextInspection: INSPECTION_EVERY, nextHeckle: 24, squall: false, phase: '',
       wasInWater: false
@@ -6639,7 +7665,10 @@
        `tpPitch`/`dist` only matter in the optional third-person view on V. */
     var EYE = 1.62;
     var cam = { yaw: Math.PI, pitch: -0.06, tpPitch: 0.52, dist: 15 };
-    var firstPerson = true;
+    var firstPerson = SET.view !== 'third';
+    var paused = false;
+    camera.fov = clamp(+SET.fov || 58, 45, 80);
+    camera.updateProjectionMatrix();
     var bobT = 0, bobY = 0, bobRoll = 0;
     var camPos = new THREE.Vector3(), camTarget = new THREE.Vector3();
     camera.rotation.order = 'YXZ';
@@ -6677,12 +7706,8 @@
        does allow it); drag-to-look is only the fallback. Crucially we do NOT
        give up on the lock after one refusal — a single mistimed gesture used to
        demote the whole session to dragging. */
-    var fp = { locked: false, giveUp: false, failures: 0, dragX: 0, dragY: 0, dragging: false };
-    var look = { sens: 0.0022, drag: 0.0042 };
-    try {
-      var savedSens = parseFloat(localStorage.getItem('blb.sens'));
-      if (savedSens > 0.0004 && savedSens < 0.02) look.sens = savedSens;
-    } catch (e) { /* private window */ }
+    var fp = { locked: false, giveUp: false, failures: 0, dragX: 0, dragY: 0, dragging: false, expectUnlock: false };
+    var look = { sens: 0.0022 * clamp(+SET.sens || 1, 0.3, 3), drag: 0.0042 };
 
     function aimNDC() { return firstPerson ? CENTRE : mouseNDC; }
     var CENTRE = new THREE.Vector2(0, 0);
@@ -6702,65 +7727,122 @@
       document.body.appendChild(hint);
     })();
     function updateHint() {
-      var show = !IS_TOUCH && S.started && firstPerson && !fp.locked;
-      hint.textContent = fp.giveUp ? 'drag to look around' : 'click to look around';
+      // the view follows the mouse anyway; the hint only offers the capture
+      var show = !IS_TOUCH && !fp.giveUp && S.started && !paused && !S.fainted && firstPerson && !fp.locked;
+      hint.textContent = 'click to capture the mouse';
       hint.classList.toggle('on', show);
+      // the on-screen sticks sit above the HUD layer, so they must get out of the menu's way
+      if (touchWrap) touchWrap.style.display = (S.started && !paused) ? '' : 'none';
       canvas.style.cursor = (firstPerson && fp.locked) ? 'none' : '';
+    }
+
+    // where the (uncaptured) mouse is, for free look's edge turning
+    var ptr = { x: 0, y: 0, inside: false };
+    document.addEventListener('mouseleave', function () { ptr.inside = false; });
+    window.addEventListener('blur', function () { ptr.inside = false; });
+    function freeLookOn() {
+      return !IS_TOUCH && firstPerson && !fp.locked && S.started && !paused && !S.fainted &&
+        !(hud.isMenuOpen && hud.isMenuOpen());
+    }
+    function edgeTurn(dt) {
+      if (!freeLookOn() || !ptr.inside) return;
+      // sideways only: pitch has a short range the mouse covers anyway, and the
+      // top edge is where the HUD's buttons live
+      var W = window.innerWidth, edge = Math.max(36, W * 0.05);
+      var kx = ptr.x < edge ? (edge - ptr.x) / edge : (ptr.x > W - edge ? -(ptr.x - (W - edge)) / edge : 0);
+      if (kx) cam.yaw += clamp(kx, -1, 1) * 2.2 * (look.sens / 0.0022) * dt;
     }
 
     function requestLook() {
       if (IS_TOUCH) { fp.giveUp = true; return; }   // nothing to capture on a phone
       if (!firstPerson || fp.locked) return;
       if (!canvas.requestPointerLock) { fp.giveUp = true; updateHint(); return; }
-      try { canvas.requestPointerLock(); } catch (err) { fp.failures++; }
+      try {
+        // newer browsers return a promise and reject it instead of throwing
+        var lockReq = canvas.requestPointerLock();
+        if (lockReq && typeof lockReq.catch === 'function') lockReq.catch(function () { /* counted below */ });
+      } catch (err) { fp.failures++; }
       setTimeout(function () {
         if (fp.locked) return;
         fp.failures++;
         if (fp.failures >= 2 && !fp.giveUp) {
           fp.giveUp = true;
-          hud.toast('Mouse capture blocked here — drag to look instead.', 'info');
+          hud.toast('Mouse capture blocked here — the view still follows the mouse; hold it at a screen edge to keep turning.', 'info');
         }
         updateHint();
       }, 500);
     }
     document.addEventListener('pointerlockchange', function () {
+      var was = fp.locked;
       fp.locked = (document.pointerLockElement === canvas);
       if (fp.locked) { fp.failures = 0; fp.giveUp = false; }
+      // Esc while the mouse is captured never reaches us as a key: the browser
+      // just drops the lock. Losing it unasked is how the player pauses.
+      if (was && !fp.locked && !fp.expectUnlock && S.started && !paused && !S.fainted) pause();
+      fp.expectUnlock = false;
       updateHint();
     });
+    function releaseLook() {
+      if (fp.locked && document.exitPointerLock) { fp.expectUnlock = true; document.exitPointerLock(); }
+    }
     document.addEventListener('pointerlockerror', function () {
       fp.failures++;
       if (fp.failures >= 2) fp.giveUp = true;
       updateHint();
     });
 
-    function setSens(v) {
-      look.sens = clamp(v, 0.0006, 0.0090);
-      try { localStorage.setItem('blb.sens', String(look.sens)); } catch (e) { /* ignore */ }
-      hud.toast('Mouse sensitivity ' + (look.sens / 0.0022).toFixed(2) + '×', 'info');
+    function setSens(v, quiet) {
+      look.sens = clamp(v, 0.0006, 0.0066);
+      SET.sens = +(look.sens / 0.0022).toFixed(2);
+      saveSettings();
+      if (!quiet) hud.toast('Mouse sensitivity ' + SET.sens.toFixed(2) + '×', 'info');
+    }
+
+    function setView(first, quiet) {
+      firstPerson = !!first;
+      SET.view = firstPerson ? 'first' : 'third';
+      saveSettings();
+      mason.group.visible = !firstPerson;
+      viewModel.visible = firstPerson;
+      if (!firstPerson) releaseLook();
+      if (!quiet) hud.toast(firstPerson ? 'First person' : 'Third person', 'info');
+      updateHint();
+    }
+
+    function setSound(on) {
+      SET.sound = !!on;
+      sfx.muted = !SET.sound;
+      if (hud.setMuted) hud.setMuted(!SET.sound);
+      saveSettings();
     }
 
     function onKey(e, down) {
       var c = e.code;
       var was = keys[c];
+      if (down && (c === 'Escape' || c === 'KeyP')) {
+        if (!was) {
+          if (hud.isMenuOpen && hud.isMenuOpen()) {
+            if (hud.closeSheet && hud.closeSheet()) { /* stepped back out of a sub-page */ }
+            else if (paused) resume();
+          } else if (S.started && !S.fainted) {
+            pause();
+          }
+        }
+        keys[c] = down;
+        return;
+      }
+      if (hud.isMenuOpen && hud.isMenuOpen()) { keys[c] = false; return; }
       keys[c] = down;
       if (!down) return;
+      if (S.fainted) return;
       if (c === 'KeyE' && !was && S.started) {
         var near = nearestNPC();
         if (near) { talkTo(near.npc); return; }   // E is talk when someone is beside you
       }
-      if (c === 'KeyV') {
-        firstPerson = !firstPerson;
-        mason.group.visible = !firstPerson;
-        viewModel.visible = firstPerson;
-        if (!firstPerson && document.exitPointerLock) document.exitPointerLock();
-        hud.toast(firstPerson ? 'First person' : 'Third person', 'info');
-        updateHint();
-      }
+      if (c === 'KeyV') setView(!firstPerson);
       if (c === 'BracketLeft') { setSens(look.sens * 0.84); return; }
       if (c === 'BracketRight') { setSens(look.sens * 1.19); return; }
-      if (c === 'KeyM') { sfx.muted = !sfx.muted; hud.toast(sfx.muted ? 'Sound off' : 'Sound on', 'info'); }
-      else if (c === 'Escape') hud.closeShop();
+      if (c === 'KeyM') { setSound(!SET.sound); hud.toast(SET.sound ? 'Sound on' : 'Sound off', 'info'); }
       if (c === 'Space') e.preventDefault();
     }
     window.addEventListener('keydown', function (e) { onKey(e, true); });
@@ -6780,21 +7862,25 @@
         orbiting = true; lastPX = e.clientX; lastPY = e.clientY;
         return;
       }
-      if (firstPerson && !fp.locked) {
-        /* Ask for the mouse AND start drag-looking in the same gesture. If the
-           lock is granted the drag never matters; if it is refused the player
-           is already looking around instead of clicking into a dead screen. */
+      if (firstPerson && !fp.locked && e.pointerType !== 'mouse') {
+        // touch: a finger on the scene drags the view; a tap still lays
         requestLook();
         orbiting = true; lastPX = e.clientX; lastPY = e.clientY;
         placing = false;
         return;
+      }
+      if (firstPerson && !fp.locked) {
+        /* Mouse: the view already follows the mouse (free look), so a click is
+           always a click — it lays a balata — and it also asks for the capture,
+           which only removes the cursor and the screen-edge limit. */
+        requestLook();
       }
       placing = true;
       tryPlace(true);
     });
     window.addEventListener('pointerup', function (e) {
       if (e.button === 2 || e.button === 1) { orbiting = false; return; }
-      if (firstPerson && !fp.locked) {
+      if (firstPerson && !fp.locked && e.pointerType !== 'mouse') {
         orbiting = false;
         // a click that did not travel still lays a balata
         if (!fp.dragging) tryPlace(true);
@@ -6811,6 +7897,17 @@
         if (my > 140) my = 140; else if (my < -140) my = -140;
         cam.yaw -= mx * look.sens;
         cam.pitch = clamp(cam.pitch - my * look.sens, -1.35, 1.35);
+        return;
+      }
+      ptr.x = e.clientX; ptr.y = e.clientY; ptr.inside = true;
+      if (freeLookOn() && e.pointerType === 'mouse' && !orbiting) {
+        /* Free look without the capture: the view follows the mouse, no button
+           held. Holding the pointer against an edge keeps turning (see tick). */
+        var fx = e.movementX || 0, fy = e.movementY || 0;
+        if (fx > 140) fx = 140; else if (fx < -140) fx = -140;
+        if (fy > 140) fy = 140; else if (fy < -140) fy = -140;
+        cam.yaw -= fx * look.sens;
+        cam.pitch = clamp(cam.pitch - fy * look.sens, -1.35, 1.35);
         return;
       }
       if (orbiting) {
@@ -6842,10 +7939,11 @@
 
     // ---- touch: left thumb walks, right thumb looks, buttons do the work
     var touch = { moveX: 0, moveZ: 0, lookId: -1, moveId: -1, ox: 0, oy: 0 };
-    var tTalk = null;
+    var tTalk = null, touchWrap = null;
     if (IS_TOUCH) buildTouchControls();
     function buildTouchControls() {
       var wrap = document.createElement('div');
+      touchWrap = wrap;
       wrap.id = 'touchlayer';
       wrap.innerHTML =
         '<div id="tstick"><div id="tnub"></div></div>' +
@@ -6976,8 +8074,9 @@
       // whoever is closer wins the E key
       if (tTalk) tTalk.style.display = who ? 'block' : 'none';
       if (who && (!pile || who.dist < 2.6)) {
-        var label = who.npc.def.sells === 'knefe'
-          ? 'knefe · ' + KNEFE_PRICE + ' l.l.'
+        var food = who.npc.def.sells && FOODS[who.npc.def.sells];
+        var label = food
+          ? food.name.toLowerCase() + ' · ' + food.price + ' l.l.'
           : 'talk to ' + who.npc.def.name;
         hud.setPrompt(IS_TOUCH ? label : 'E — ' + label);
       } else if (pile && keys.KeyE) {
@@ -7185,6 +8284,20 @@
       }
     ];
 
+    // the food-court vendors, one behind each counter the world built
+    (world.foodCourts || []).forEach(function (court) {
+      (court.stalls || []).forEach(function (stall) {
+        var v = VENDORS[stall.id];
+        if (!v || !FOODS[stall.id]) return;
+        NPC_DEFS.push({
+          id: 'vendor-' + stall.id, name: v.name, voice: v.voice, hat: v.hat, scale: 1.0,
+          shirt: v.shirt, hatCol: v.hatCol, yaw: 0, sells: stall.id, court: court.name,
+          at: function () { return { x: stall.x, y: DECK_Y, z: stall.z - 3.1 }; },
+          lines: v.lines
+        });
+      });
+    });
+
     function angleTo(a, b, k) {
       var d = ((b - a + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
       return a + d * k;
@@ -7256,26 +8369,39 @@
        Im Kamel hands you mouna on the lines where she offers it. */
     /* Jardali has no conversation of his own: pressing E at his counter buys
        the knefe, and which line he gives you depends on how it went. */
-    function buyKnefe(npc) {
-      var kind;
-      if (S.health >= HEALTH_MAX - 0.5) {
+    /* Everyone who sells food works the same way: E at the counter buys one.
+       Jardali alone will feed you for free when you are about to fold. */
+    function eat(food) {
+      S.health = clamp(S.health + food.sta, 0, HEALTH_MAX);
+      S.hp = clamp(S.hp + food.hp, 0, HP_MAX);
+      if (food.buff) S.buffs[food.buff.id] = food.buff.t;
+      S.knefeEaten++;
+      sfx.purchase();
+      pushStats();
+    }
+    function foodToast(food, paid) {
+      var bits = [food.name + '.'];
+      if (food.sta) bits.push('+' + food.sta + ' stamina');
+      if (food.hp) bits.push('+' + food.hp + ' health');
+      if (food.buff) bits.push(food.buff.label.split('·')[1].trim() + ' ' + food.buff.t + 's');
+      bits.push(paid ? '−' + food.price + ' l.l.' : 'on the house');
+      return bits.join(' · ');
+    }
+    function buyFood(npc) {
+      var food = FOODS[npc.def.sells], kind;
+      var stuffed = S.health >= HEALTH_MAX - 0.5 && S.hp >= HP_MAX - 0.5 && !food.buff;
+      if (stuffed) {
         kind = 'full';
-      } else if (S.lira >= KNEFE_PRICE) {
-        S.lira -= KNEFE_PRICE;
-        S.health = clamp(S.health + KNEFE_HEAL, 0, HEALTH_MAX);
-        S.knefeEaten++;
+      } else if (S.lira >= food.price) {
+        S.lira -= food.price;
+        eat(food);
         kind = 'sold';
-        sfx.purchase();
-        hud.toast('Knefe b jebne. +' + KNEFE_HEAL + ' · −' + KNEFE_PRICE + ' l.l.', 'good');
-        pushStats();
-      } else if (S.health <= 25) {
+        hud.toast(foodToast(food, true), 'good');
+      } else if (npc.def.sells === 'knefe' && (S.health <= 25 || S.hp <= 25)) {
         // he is not going to watch you fold over 25 lira
-        S.health = clamp(S.health + KNEFE_HEAL, 0, HEALTH_MAX);
-        S.knefeEaten++;
+        eat(food);
         kind = 'broke';
-        sfx.purchase();
-        hud.toast('3a 7sabe — on the house.', 'good');
-        pushStats();
+        hud.toast('3a 7sabe — ' + foodToast(food, false), 'good');
       } else {
         kind = 'pricey';
         sfx.ui();
@@ -7286,7 +8412,7 @@
     }
 
     function talkTo(npc) {
-      if (npc.def.sells === 'knefe') return buyKnefe(npc);
+      if (npc.def.sells) return buyFood(npc);
       var pool = npc.def.talk;
       if (!pool || !pool.length) return;
       var at = npc.talkIdx % pool.length;
@@ -7390,6 +8516,312 @@
       hud.heckle(pick(list));
     }
 
+    // ----------------------------------------------------------- billboards
+    /* The world says where the boards stand; we hang them and paint them from
+       the ad list the CMS publishes (ads.json, or a preview it pushed into
+       this browser). Each board turns over every ~25 s with a flip, and an
+       impression is counted once per showing, when the board is on screen. */
+    var ADS = window.BLB_ADS;
+    var adList = ADS ? ADS.normalize(ADS.DEFAULTS) : [];
+    var adSource = 'defaults';
+    var HOUSE_AD = {
+      id: 'house', sponsor: 'Your ad here', ar: 'إعلانك هون',
+      headline: 'This board is free. Put your brand on the corniche.', tagline: 'mmerhikarim@gmail.com',
+      layout: 'poster', bg: '#E4D7B3', fg: '#0B3A4F', accent: '#F2B733'
+    };
+    var boards = [];
+    (function buildBoards() {
+      var slots = world.adSlots || [];
+      if (!slots.length || !ADS) return;
+      var postMat = new THREE.MeshPhongMaterial({ color: P.CEMENT, flatShading: true, shininess: 4, specular: 0x111111 });
+      var frameMat = new THREE.MeshPhongMaterial({ color: P.SEA_DEEP, flatShading: true, shininess: 10, specular: 0x222222 });
+      var lampMat = new THREE.MeshBasicMaterial({ color: P.SUN });
+      for (var n = 0; n < slots.length; n++) {
+        var s = slots[n];
+        var g = new THREE.Group();
+        g.position.set(s.x, 0, s.z);
+        g.rotation.y = s.ry || 0;
+        var legH = s.y - s.base + s.h * 0.5;
+        for (var side = -1; side <= 1; side += 2) {
+          var leg = new THREE.Mesh(new THREE.BoxGeometry(0.28, legH, 0.28), postMat);
+          leg.position.set(side * s.w * 0.32, s.base + legH / 2, -0.22);
+          g.add(leg);
+        }
+        var frame = new THREE.Mesh(new THREE.BoxGeometry(s.w + 0.42, s.h + 0.42, 0.24), frameMat);
+        frame.position.set(0, s.y + s.h / 2, -0.06);
+        g.add(frame);
+        var lamp = new THREE.Mesh(new THREE.BoxGeometry(s.w * 0.8, 0.12, 0.3), lampMat);
+        lamp.position.set(0, s.y + s.h + 0.3, 0.2);
+        g.add(lamp);
+        var cv = document.createElement('canvas');
+        cv.width = 1024; cv.height = 512;
+        var tx = new THREE.CanvasTexture(cv);
+        tx.encoding = THREE.sRGBEncoding;
+        tx.anisotropy = 4;
+        var face = new THREE.Mesh(new THREE.PlaneGeometry(s.w, s.h),
+          new THREE.MeshBasicMaterial({ map: tx, toneMapped: false }));
+        face.position.set(0, s.y + s.h / 2, 0.08);
+        g.add(face);
+        scene.add(g);
+        // the deck legs are solid; roof and mole boards are out of reach anyway
+        if (s.base <= DECK_Y + 0.01 && world.landColliders) {
+          for (var sd = -1; sd <= 1; sd += 2) {
+            var lx = s.x + Math.cos(s.ry || 0) * sd * s.w * 0.32, lz = s.z;
+            world.landColliders.push({ x1: lx - 0.25, z1: lz - 0.45, x2: lx + 0.25, z2: lz + 0.05, top: DECK_Y + legH + 2 });
+          }
+        }
+        boards.push({
+          slot: s, group: g, face: face, canvas: cv, ctx: cv.getContext('2d'), tex: tx,
+          ad: null, next: 2 + n * 4.5, flip: 0, painted: false, counted: false, seen: 0
+        });
+      }
+    })();
+
+    function paintBoard(b) {
+      try { ADS.draw(b.ctx, 1024, 512, b.ad || HOUSE_AD); } catch (e) { /* bad copy never kills the game */ }
+      b.tex.needsUpdate = true;
+      b.counted = false; b.seen = 0;
+    }
+    function nextAd(b) {
+      b.ad = ADS.pick(adList, b.slot.placement, b.ad && b.ad.id) || null;
+      paintBoard(b);
+    }
+    function setAds(list, source) {
+      adList = list || [];
+      adSource = source || 'ads.json';
+      for (var i = 0; i < boards.length; i++) nextAd(boards[i]);
+    }
+    if (ADS && boards.length) {
+      setAds(adList, 'defaults');
+      ADS.load(function (list, source) {
+        setAds(list, source);
+        if (source === 'preview') hud.toast('Billboards: showing the CMS preview.', 'info');
+      });
+      // fonts arrive after the first paint; repaint so Arabic is real Arabic
+      if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(function () { boards.forEach(paintBoard); }).catch(function () {});
+      }
+      // the CMS in another tab can push a new preview while we are running
+      window.addEventListener('storage', function (e) {
+        if (e.key !== ADS.PREVIEW_KEY) return;
+        ADS.load(function (list, source) { setAds(list, source); hud.toast('Billboards updated from the CMS.', 'info'); });
+      });
+    }
+    var boardV = new THREE.Vector3();
+    function updateBoards(dt) {
+      if (!boards.length) return;
+      for (var i = 0; i < boards.length; i++) {
+        var b = boards[i];
+        b.next -= dt;
+        if (b.next <= 0 && b.flip === 0) b.flip = 1;
+        if (b.flip > 0) {
+          // fold the face shut, swap the poster at the halfway point, open it
+          var before = b.flip;
+          b.flip = Math.max(0, b.flip - dt * 2.2);
+          if (before > 0.5 && b.flip <= 0.5) nextAd(b);
+          b.face.scale.y = Math.max(0.02, Math.abs(b.flip - 0.5) * 2);
+          if (b.flip === 0) { b.face.scale.y = 1; b.next = 24 + Math.random() * 8; }
+        }
+        // impression: on screen, near enough to read, for over a second
+        if (!b.counted && b.ad && b.ad.id !== 'house') {
+          boardV.set(b.slot.x, b.slot.y + b.slot.h / 2, b.slot.z);
+          var dist = boardV.distanceTo(camera.position);
+          boardV.project(camera);
+          var vis = boardV.z < 1 && Math.abs(boardV.x) < 0.95 && Math.abs(boardV.y) < 0.95 &&
+            dist < 34 * Math.max(b.slot.w / 8, 1);
+          b.seen = vis ? b.seen + dt : 0;
+          if (b.seen > 1.2 && S.started) { b.counted = true; ADS.bump(b.ad.id); }
+        }
+      }
+    }
+
+    // ------------------------------------------------------------- health
+    var hurtBucket = 0, hurtCool = 0, slamCool = 0;
+    function damage(amount, cause) {
+      if (!S.started || S.fainted || amount <= 0) return;
+      S.hp = Math.max(0, S.hp - amount);
+      S.faintCause = cause || S.faintCause;
+      hurtBucket += amount;
+      if (hurtBucket >= 2.5 && hurtCool <= 0) {
+        hud.hurt(hurtBucket);
+        if (sfx.hurt) sfx.hurt();
+        hurtBucket = 0; hurtCool = 0.5;
+      }
+      pushStats();
+      if (S.hp <= 0) faint();
+    }
+
+    var FAINT_LINES = {
+      drown: 'Abou Hassan\'s nephew pulled you out by the fanella.',
+      fall: 'You found the ground faster than you planned.',
+      sea: 'The sea came over the edge and won that round.',
+      starve: 'You worked until you folded, on an empty stomach.',
+      cold: 'November water. You stayed in too long.'
+    };
+    function faint() {
+      if (S.fainted) return;
+      S.fainted = 4.2;
+      S.faints++;
+      placing = false; keys = {};
+      var bill = Math.min(Math.floor(S.lira), 20 + Math.round(S.lira * 0.15));
+      S.lira -= bill;
+      var spilt = Math.floor(S.mortar / 2);
+      S.mortar -= spilt;
+      releaseLook();
+      hud.setPrompt(null);
+      hud.showFaint({
+        text: (FAINT_LINES[S.faintCause] || FAINT_LINES.starve) +
+          (spilt > 0 ? ' Half the barrow went with you.' : ''),
+        bill: bill > 0 ? 'Hospital bill · ' + bill + ' l.l.' : 'Hospital bill · waived. You had nothing.'
+      });
+      npcEvent('spent');
+      pushStats();
+    }
+    function wakeUp() {
+      S.fainted = 0;
+      S.hp = RESPAWN_HP;
+      S.health = Math.max(S.health, 55);
+      S.faintCause = '';
+      body.teleport(0, DECK_Y, -11);
+      body.vel.set(0, 0, 0);
+      cam.yaw = Math.PI; cam.pitch = -0.06;
+      hud.hideFaint();
+      hud.toast('Back on the corniche. Eat something.', 'info');
+      updateHint();
+      pushStats();
+    }
+
+    var cellUnder = { i: 0, j: 0 };
+    function updateHealth(dt, t, input) {
+      hurtCool -= dt; slamCool -= dt;
+      for (var id in S.buffs) {
+        if (!S.buffs.hasOwnProperty(id)) continue;
+        S.buffs[id] -= dt;
+        if (S.buffs[id] <= 0) delete S.buffs[id];
+      }
+      if (hud.setBuffs) {
+        var bl = [];
+        for (var bid in S.buffs) {
+          if (!S.buffs.hasOwnProperty(bid)) continue;
+          var src = null;
+          for (var fk in FOODS) if (FOODS[fk].buff && FOODS[fk].buff.id === bid) src = FOODS[fk].buff;
+          bl.push({ id: bid, label: src ? src.label : bid, t: S.buffs[bid] });
+        }
+        hud.setBuffs(bl);
+      }
+
+      // a hard landing
+      if (body.landedThisStep && !body.inWater && body.landImpact > FALL_SAFE) {
+        damage((body.landImpact - FALL_SAFE) * 5, 'fall');
+        hud.toast('Ouch. That was a long way down.', 'bad');
+      }
+
+      if (body.inWater) {
+        if (S.health <= 0) {
+          damage(HP_DROWN * dt, 'drown');
+          if (slamCool <= 0) { hud.toast('No strength left to swim — get OUT.', 'bad'); slamCool = 4; }
+        } else {
+          damage(HP_COLD * dt, 'cold');
+        }
+      } else if (body.grounded && Math.abs(body.pos.y - TILE_TOP) < 0.12) {
+        // standing on the frontier while the waves come over it
+        worldToCell(body.pos.x, body.pos.z, cellUnder);
+        if (sim.get(cellUnder.i, cellUnder.j) && sim.exposure(cellUnder.i, cellUnder.j) > 0) {
+          var over = waves.height(body.pos.x, body.pos.z, t) - (TILE_TOP + 0.12);
+          if (over > 0) {
+            damage(over * 16 * dt, 'sea');
+            if (slamCool <= 0 && over > 0.12) {
+              hud.toast('The waves are breaking over the edge. Step back.', 'bad');
+              fx.burst(body.pos.x, TILE_TOP + 0.3, body.pos.z, 0.8);
+              slamCool = 5;
+            }
+          }
+        }
+      }
+      if (!body.inWater && S.health <= 0) damage(HP_STARVE * dt, 'starve');
+
+      // healing: rested, dry and fed
+      var regen = 0;
+      if (!body.inWater && S.health > 40) regen = HP_REGEN;
+      if (S.buffs.shab3an && !body.inWater) regen = Math.max(regen, 1.4);
+      if (regen && S.hp < HP_MAX) {
+        var hb = S.hp;
+        S.hp = Math.min(HP_MAX, S.hp + regen * dt);
+        if (Math.floor(hb) !== Math.floor(S.hp)) pushStats();
+      }
+      void input;
+    }
+
+    // ---------------------------------------------------------------- menu
+    function menuSummary() {
+      return { metres: sim.count * 4, tiles: sim.count, laid: S.laid, lira: Math.floor(S.lira) };
+    }
+    var hasSave = false;
+    function showMainMenu() {
+      hud.showMenu({ mode: 'main', hasSave: hasSave, summary: hasSave ? menuSummary() : null, settings: SET });
+    }
+    function pause() {
+      if (!S.started || paused) return;
+      paused = true;
+      keys = {}; placing = false; orbiting = false;
+      save();
+      releaseLook();
+      hud.setPrompt(null);
+      hud.showMenu({ mode: 'pause', summary: menuSummary(), settings: SET });
+      updateHint();
+    }
+    function resume() {
+      if (!paused) return;
+      paused = false;
+      hud.hideMenu();
+      clock.getDelta();          // do not bill the pause to the next frame
+      if (firstPerson) requestLook();
+      updateHint();
+    }
+    function quitToMenu() {
+      save();
+      hasSave = true;
+      paused = false;
+      S.started = false;
+      ghost.visible = false;
+      if (hud.setReticle) hud.setReticle('none');
+      hud.setPrompt(null);
+      showMainMenu();
+      updateHint();
+    }
+    function resetGame() {
+      var all = [];
+      sim.forEach(function (tl) { all.push(tl); });
+      for (var n = 0; n < all.length; n++) sim.remove(all[n].i, all[n].j);
+      tiles.clear();
+      S.health = HEALTH_MAX; S.hp = HP_MAX; S.lira = 0; S.knefeEaten = 0;
+      S.laid = 0; S.lost = 0; S.buffs = {}; S.faints = 0; S.fainted = 0;
+      freshStart();
+      body.teleport(0, DECK_Y, -11);
+      cam.yaw = Math.PI; cam.pitch = -0.06;
+      npcs.forEach(function (n2) { n2.talkIdx = 0; n2.greeted = false; });
+      try { localStorage.removeItem(SAVE_KEY); } catch (e) { /* ignore */ }
+      hasSave = false;
+      pushStats();
+    }
+    function onMenu(act, v) {
+      sfx.unlock();
+      if (act === 'continue') { hud.hideMenu(); start(); if (firstPerson) requestLook(); }
+      else if (act === 'new') { resetGame(); hud.hideMenu(); start(); if (firstPerson) requestLook(); }
+      else if (act === 'resume') resume();
+      else if (act === 'pause') pause();
+      else if (act === 'quit') quitToMenu();
+      else if (act === 'setting' && v) {
+        if (v.key === 'sound') setSound(v.value);
+        else if (v.key === 'sens') setSens(0.0022 * v.value, true);
+        else if (v.key === 'fov') {
+          SET.fov = clamp(+v.value, 45, 80); saveSettings();
+          camera.fov = SET.fov; camera.updateProjectionMatrix();
+        } else if (v.key === 'view') setView(v.value === 'first', true);
+        else if (v.key === 'bob') { SET.bob = !!v.value; saveSettings(); }
+      }
+    }
+
     var statsDirty = true;
     function pushStats() { statsDirty = true; }
     function flushStats() {
@@ -7398,7 +8830,7 @@
       hud.setStats({
         mortar: Math.floor(S.mortar), mortarMax: S.mortarMax,
         tiles: sim.count, metres: sim.count * 4, lira: Math.floor(S.lira),
-        health: S.health, healthMax: HEALTH_MAX,
+        health: S.health, healthMax: HEALTH_MAX, hp: S.hp, hpMax: HP_MAX,
         tierIdx: 0, swell: waves.swell(S.elapsed),
         laid: S.laid, lost: S.lost
       });
@@ -7409,6 +8841,7 @@
       return {
         v: 4, sim: sim.serialize(), mortar: S.mortar,
         health: S.health, lira: S.lira, knefeEaten: S.knefeEaten,
+        hp: S.hp, buffs: S.buffs, faints: S.faints,
         elapsed: S.elapsed, laid: S.laid, lost: S.lost,
         px: body.pos.x, py: body.pos.y, pz: body.pos.z
       };
@@ -7424,6 +8857,10 @@
         S.health = typeof d.health === 'number' ? d.health : HEALTH_MAX;
         S.lira = d.lira || 0;
         S.knefeEaten = d.knefeEaten || 0;
+        // older saves predate health: they start whole
+        S.hp = typeof d.hp === 'number' && d.hp > 0 ? clamp(d.hp, 1, HP_MAX) : HP_MAX;
+        S.buffs = (d.buffs && typeof d.buffs === 'object') ? d.buffs : {};
+        S.faints = d.faints || 0;
         S.elapsed = d.elapsed || 0; S.laid = d.laid || 0; S.lost = d.lost || 0;
         tiles.clear();
         sim.forEach(function (t) { tiles.add(t.i, t.j, t.tier); });
@@ -7445,19 +8882,27 @@
 
     var restored = applySave(saved);
     if (!restored) freshStart();
+    hasSave = restored && (S.laid > 0 || sim.count > 5 || S.lira > 0);
     pushStats();
-    hud.showIntro();
+    setView(firstPerson, true);
+    showMainMenu();
 
+    var startedOnce = false;
     function start() {
       if (S.started) return;
       S.started = true;
+      paused = false;
       sfx.unlock();
       hud.hideIntro();
-      hud.toast(IS_TOUCH
-        ? 'Drag to look. Hold SHOVEL at a pile, then tap بلّط.'
-        : 'Click to capture the mouse. Hold E at a pile for mouna.', 'info');
+      clock.getDelta();
+      if (!startedOnce) {
+        startedOnce = true;
+        hud.toast(IS_TOUCH
+          ? 'Drag to look. Hold SHOVEL at a pile, then tap بلّط.'
+          : 'Click to capture the mouse. Hold E at a pile for mouna. Esc pauses.', 'info');
+        setTimeout(heckle, 6500);
+      }
       updateHint();
-      setTimeout(heckle, 6500);
     }
 
     // ------------------------------------------------------------ the loop
@@ -7474,12 +8919,20 @@
       requestAnimationFrame(frame);
       var dt = Math.min(clock.getDelta(), 0.05);
       if (!dt) return;
+      if (paused) {
+        // the world holds still behind the pause menu; only the HUD animates
+        hud.frame(dt);
+        renderer.render(scene, camera);
+        return;
+      }
       tick(dt);
     }
 
     function tick(dt) {
       S.elapsed += dt;
       var t = S.elapsed;
+
+      edgeTurn(dt);
 
       // --- camera keys
       if (keys.ArrowLeft) cam.yaw += dt * 1.7;
@@ -7503,13 +8956,24 @@
 
       // under a quarter health you slow down; empty, you can barely walk
       var legs = S.health <= 0 ? 0.45 : (S.health < 25 ? 0.7 : 1);
+      if (S.hp < 25) legs *= 0.8;           // hurt, you limp
+      var canMove = S.started && !S.fainted;
       var input = {
-        moveX: S.started ? moveVec.x * legs : 0,
-        moveZ: S.started ? moveVec.z * legs : 0,
-        jump: !!keys.Space && S.health > 0,
-        run: !!(keys.ShiftLeft || keys.ShiftRight) && S.health > 25
+        moveX: canMove ? moveVec.x * legs : 0,
+        moveZ: canMove ? moveVec.z * legs : 0,
+        jump: canMove && !!keys.Space && S.health > 0,
+        run: canMove && !!(keys.ShiftLeft || keys.ShiftRight) && S.health > 25
       };
       body.step(dt, t, input, waves);
+      if (S.started) {
+        if (S.fainted) {
+          S.fainted -= dt;
+          if (S.fainted <= 0) wakeUp();
+        } else {
+          updateHealth(dt, t, input);
+        }
+      }
+      updateBoards(dt);
 
       // --- simulation
       var destroyed = sim.update(dt, t);
@@ -7534,8 +8998,8 @@
         sim.forEach(function (tile) { if (tile.hp < tile.maxHp) tiles.wear(tile); });
       }
 
-      if (placing) tryPlace(false);
-      if (S.started) updateGathering(dt);
+      if (placing && !S.fainted) tryPlace(false);
+      if (S.started && !S.fainted) updateGathering(dt);
       updateNPCs(dt);
       updateSky();
 
@@ -7584,11 +9048,12 @@
       S.wasInWater = body.inWater;
 
       // stamina drains by what you are actually doing
-      if (S.started) {
+      if (S.started && !S.fainted) {
         var drain = DRAIN_IDLE;
         if (body.inWater) drain = DRAIN_WATER;
         else if (digging) drain = DRAIN_DIG;
         else if (input.run && spd > 0.5) drain = DRAIN_RUN;
+        if (S.buffs.barid) drain *= 0.5;      // a jallab in you
         var before = S.health;
         S.health = clamp(S.health - drain * dt, 0, HEALTH_MAX);
         if (Math.floor(before) !== Math.floor(S.health)) pushStats();
@@ -7603,9 +9068,20 @@
       }
 
       // --- camera
-      if (firstPerson) {
+      if (!S.started) {
+        /* Behind the main menu: a slow drift along the corniche and out over
+           the tiles, the castle and the mole swinging through the right side
+           of the screen while the menu holds the left. */
+        var ca = t * 0.028;
+        viewModel.visible = false;
+        camera.position.set(-18 + Math.sin(ca) * 30, 9 + Math.sin(ca * 0.7) * 2.5, 30 + Math.cos(ca) * 16);
+        camera.rotation.set(0, 0, 0);
+        camTarget.set(-28 + Math.sin(ca * 0.6) * 22, 2.5, -6);
+        camera.lookAt(camTarget);
+      } else if (firstPerson) {
+        viewModel.visible = !S.fainted;
         // head bob keyed to actual ground speed, killed while swimming
-        var bobAmt = clamp(spd / 6, 0, 1) * (body.inWater ? 0 : 1);
+        var bobAmt = clamp(spd / 6, 0, 1) * (body.inWater ? 0 : 1) * (SET.bob === false ? 0 : 1);
         bobT += dt * (5.5 + spd * 1.5);
         bobY = lerp(bobY, Math.sin(bobT) * 0.045 * bobAmt, clamp(dt * 12, 0, 1));
         bobRoll = lerp(bobRoll, Math.cos(bobT * 0.5) * 0.013 * bobAmt, clamp(dt * 10, 0, 1));
@@ -7636,7 +9112,7 @@
       }
 
       // --- ghost balata under the cursor
-      if (S.started) {
+      if (S.started && !S.fainted) {
         raycaster.setFromCamera(aimNDC(), camera);
         if (raycaster.ray.intersectPlane(groundPlane, hitPoint)) {
           worldToCell(hitPoint.x, hitPoint.z, cellTmp);
@@ -7650,6 +9126,9 @@
             ghostMat.opacity = bad ? 0.22 : 0.30 + Math.sin(t * 6) * 0.06;
           }
         } else { ghost.visible = false; if (hud.setReticle) hud.setReticle('none'); }
+      } else if (ghost.visible) {
+        ghost.visible = false;
+        if (hud.setReticle) hud.setReticle('none');
       }
 
       sea.update(t, body.pos.x, body.pos.z);
@@ -7691,7 +9170,9 @@
       state: S, sim: sim, save: save, serialize: serialize,
       body: body, world: world, camera: camera, npcs: npcs, tiles: tiles,
       waves: waves, cam: cam, hud: hud, renderer: renderer, scene: scene,
-      tick: tick, npcSay: npcSay, npcEvent: npcEvent, sfx: sfx
+      tick: tick, npcSay: npcSay, npcEvent: npcEvent, sfx: sfx,
+      damage: damage, pause: pause, resume: resume, onMenu: onMenu, boards: boards,
+      settings: SET, foods: FOODS, adSource: function () { return adSource; }
     };
   }
 

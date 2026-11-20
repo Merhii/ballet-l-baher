@@ -39,6 +39,13 @@
     mortar: 60, barrow: 300, shabeb: 450, flood: 600
   };
 
+  /* The maker, shown in the credits. Billboard space is sold by email. */
+  const CONTACT = {
+    github: 'https://github.com/Merhii',
+    linkedin: 'https://www.linkedin.com/in/karimmerhi',
+    email: 'mmerhikarim@gmail.com'
+  };
+
   /* --------------------------------------------------------------- heckles */
   // The uncle on the railing. Deadpan, affectionate, never cruel.
   const HECKLES = [
@@ -145,7 +152,7 @@
     CSS_DONE = true;
     const s = el('style');
     s.id = 'blb-hud-style';
-    s.textContent = STYLE + '\n' + STYLE2 + '\n' + STYLE3;
+    s.textContent = STYLE + '\n' + STYLE2 + '\n' + STYLE3 + '\n' + STYLE4;
     document.head.appendChild(s);
   }
 
@@ -575,6 +582,135 @@
 '}',
 ''].join('\n');
 
+  const STYLE4 = [
+/* --- health, buffs, hurt, faint ----------------------------------------- */
+'.blb-hp.life .fill{background:var(--blb-terra);}',
+'.blb-hp.life.low .fill{background:var(--blb-rust);animation:blb-throb 1s ease-in-out infinite;}',
+'.blb-hp .num{font-size:11px;font-weight:700;font-variant-numeric:tabular-nums;opacity:.8;}',
+'.blb-hp .heart{display:inline-block;width:10px;height:9px;margin-right:5px;vertical-align:-1px;',
+'  background:var(--blb-terra);clip-path:polygon(50% 100%,0 38%,0 12%,22% 0,50% 18%,78% 0,100% 12%,100% 38%);}',
+'@keyframes blb-throb{0%,100%{opacity:1}50%{opacity:.55}}',
+'.blb-buffs{display:flex;flex-wrap:wrap;gap:5px;}',
+'.blb-buff{padding:3px 7px 4px;font-size:10px;font-weight:700;letter-spacing:.1em;',
+'  text-transform:uppercase;background:var(--blb-ink);color:var(--blb-foam);',
+'  border:1.5px solid var(--blb-ink);font-variant-numeric:tabular-nums;}',
+'.blb-buff b{color:var(--blb-haz);font-weight:700;margin-left:4px;}',
+'.blb-hurt{position:absolute;inset:0;pointer-events:none;opacity:0;',
+'  background:radial-gradient(120% 95% at 50% 50%,rgba(185,80,47,0) 52%,rgba(140,74,47,.75) 100%);}',
+'.blb-faint{position:absolute;inset:0;display:none;place-content:center;text-align:center;',
+'  gap:10px;padding:24px;pointer-events:auto;background:rgba(10,26,51,.82);color:var(--blb-foam);}',
+'.blb-faint.on{display:grid;animation:blb-fade .6s ease-out both;}',
+'.blb-faint .ar{font-family:var(--blb-kufi);font-size:clamp(40px,10vw,84px);line-height:1.05;',
+'  color:var(--blb-haz);direction:rtl;}',
+'.blb-faint .en{font-size:clamp(18px,3.4vw,26px);font-weight:700;letter-spacing:.12em;text-transform:uppercase;}',
+'.blb-faint .tx{max-width:44ch;margin:0 auto;font-size:15px;line-height:1.45;opacity:.85;}',
+'.blb-faint .bill{margin:6px auto 0;padding:8px 14px;border:2px dashed rgba(237,246,243,.5);',
+'  font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-variant-numeric:tabular-nums;}',
+'@keyframes blb-fade{from{opacity:0}to{opacity:1}}',
+'.blb-menubtn{pointer-events:auto;width:34px;height:30px;display:grid;place-items:center;}',
+'.blb-menubtn:hover{background-color:var(--blb-haz);}',
+'.blb-menubtn i{display:block;width:14px;height:2.5px;background:var(--blb-ink);box-shadow:0 5px 0 var(--blb-ink),0 -5px 0 var(--blb-ink);}',
+
+/* --- the menu: a municipal noticeboard over the live corniche ----------- */
+'.blb-menu{position:absolute;inset:0;display:none;pointer-events:auto;overflow:hidden;',
+'  background:linear-gradient(90deg,rgba(11,58,79,.78) 0,rgba(11,58,79,.5) 38%,rgba(11,58,79,.05) 70%);}',
+'.blb-menu.on{display:block;}',
+/* the in-game HUD steps aside while a menu is up */
+'.blb.menu-open .blb-stats,.blb.menu-open .blb-tr,.blb.menu-open .blb-cross,',
+'.blb.menu-open .blb-prompt,.blb.menu-open .blb-toasts,.blb.menu-open .blb-saylayer,',
+'.blb.menu-open .blb-heckle{visibility:hidden;}',
+'.blb-menu[data-mode="pause"]{background:rgba(10,26,51,.62);}',
+'.blb-mwrap{position:absolute;inset:0;display:flex;align-items:stretch;gap:22px;',
+'  padding:max(18px,3vh) max(18px,3vw);overflow-y:auto;}',
+'.blb-mpanel{position:relative;width:min(430px,100%);flex:0 0 auto;display:flex;flex-direction:column;',
+'  padding:0 0 16px;align-self:center;animation:blb-menu-in .42s cubic-bezier(.2,1.2,.4,1) both;}',
+'@keyframes blb-menu-in{from{opacity:0;transform:translateX(-26px) rotate(-1deg)}to{opacity:1;transform:none}}',
+'.blb-mpanel .cap{height:11px;}',
+'.blb-mtitle{padding:14px 20px 0;}',
+'.blb-mtitle .ar{font-family:var(--blb-kufi);font-weight:700;direction:rtl;text-align:right;',
+'  font-size:clamp(46px,9vw,82px);line-height:1.02;color:var(--blb-ink);',
+'  text-shadow:3px 3px 0 var(--blb-haz),5px 5px 0 var(--blb-ghost);}',
+'.blb-mtitle .lat{margin-top:6px;font-weight:700;font-size:clamp(20px,3.6vw,30px);',
+'  letter-spacing:.07em;text-transform:uppercase;line-height:1;}',
+'.blb-mtitle .gl{margin-top:8px;font-size:13.5px;line-height:1.4;opacity:.82;}',
+'.blb-mtitle .gl b{background:var(--blb-haz);box-shadow:0 0 0 2px var(--blb-haz);}',
+'.blb-mpause{display:none;padding:14px 20px 0;}',
+'.blb-mpause .ar{font-family:var(--blb-kufi);font-size:40px;line-height:1;direction:rtl;text-align:right;}',
+'.blb-mpause .en{font-size:24px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;}',
+'.blb-menu[data-mode="pause"] .blb-mtitle{display:none;}',
+'.blb-menu[data-mode="pause"] .blb-mpause{display:block;}',
+'.blb-mnav{display:grid;gap:7px;padding:16px 20px 4px;}',
+'.blb-mbtn{pointer-events:auto;display:grid;grid-template-columns:30px 1fr auto;align-items:center;gap:10px;',
+'  text-align:left;padding:9px 12px 10px;background:var(--blb-paper);border:2px solid var(--blb-ink);',
+'  box-shadow:3px 3px 0 0 var(--blb-ink);transition:transform .08s,box-shadow .08s,background-color .12s;}',
+'.blb-mbtn .n{font-size:12px;font-weight:700;opacity:.55;font-variant-numeric:tabular-nums;}',
+'.blb-mbtn .l{font-size:18px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;line-height:1.05;}',
+'.blb-mbtn .s{display:block;font-size:11.5px;font-weight:500;letter-spacing:.02em;text-transform:none;opacity:.7;margin-top:2px;}',
+'.blb-mbtn .a{font-family:var(--blb-kufi);font-size:16px;direction:rtl;opacity:.75;}',
+'.blb-mbtn:hover,.blb-mbtn:focus-visible{background:var(--blb-haz);transform:translate(1px,1px);',
+'  box-shadow:2px 2px 0 0 var(--blb-ink);}',
+'.blb-mbtn.primary{background:var(--blb-haz);}',
+'.blb-mbtn.primary:hover{background:var(--blb-foam);}',
+'.blb-mbtn.warn .l{color:var(--blb-rust);}',
+'.blb-mbtn[hidden]{display:none;}',
+'.blb-mbtn[disabled]{background:var(--blb-cement);cursor:progress;opacity:.7;}',
+'.blb-msum{margin:12px 20px 0;padding:8px 0 0;border-top:2px solid var(--blb-ink);display:grid;',
+'  grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;}',
+'.blb-msum div{font-size:9.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;opacity:.75;}',
+'.blb-msum b{display:block;font-size:20px;letter-spacing:0;opacity:1;font-variant-numeric:tabular-nums;color:var(--blb-ink);}',
+'.blb-mfoot{margin:12px 20px 0;font-size:10px;letter-spacing:.1em;text-transform:uppercase;opacity:.55;line-height:1.5;}',
+'.blb-menu .blb-iload{margin:12px 20px 0;width:auto;}',
+'.blb-msheet{position:relative;flex:1 1 auto;max-width:560px;align-self:center;display:none;',
+'  padding:0 0 16px;max-height:100%;overflow-y:auto;animation:blb-menu-in .3s ease-out both;}',
+'.blb-msheet.on{display:block;}',
+'.blb-msheet .cap{height:8px;}',
+'.blb-msheet h3{display:flex;align-items:baseline;justify-content:space-between;gap:10px;',
+'  padding:12px 18px 8px;border-bottom:2px solid var(--blb-ink);font-size:20px;letter-spacing:.1em;text-transform:uppercase;}',
+'.blb-msheet h3 .ar{font-family:var(--blb-kufi);font-size:20px;letter-spacing:0;opacity:.7;}',
+'.blb-msheet .bd{padding:12px 18px 0;font-size:14px;line-height:1.45;}',
+'.blb-msheet .bd p{margin:0 0 10px;}',
+'.blb-msheet .bd h4{margin:12px 0 6px;font-size:11px;letter-spacing:.16em;text-transform:uppercase;opacity:.7;}',
+'.blb-msheet .keys{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:2px 10px;}',
+'.blb-msheet .keys div{font-size:12.5px;font-weight:600;padding:2px 0;}',
+'.blb-msheet a{pointer-events:auto;color:var(--blb-ink);font-weight:700;',
+'  text-decoration:underline;text-decoration-color:var(--blb-haz);text-decoration-thickness:3px;}',
+'.blb-msheet a:hover{background:var(--blb-haz);}',
+'.blb-links{display:flex;flex-wrap:wrap;gap:6px 18px;}',
+'.blb-mback{pointer-events:auto;margin:14px 18px 0;padding:7px 14px 8px;font-size:12px;font-weight:700;',
+'  letter-spacing:.14em;text-transform:uppercase;border:2px solid var(--blb-ink);background:var(--blb-paper);',
+'  box-shadow:2px 2px 0 var(--blb-ink);}',
+'.blb-mback:hover{background:var(--blb-haz);}',
+'.blb-set{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:6px 14px;',
+'  padding:9px 0;border-bottom:1px dashed rgba(11,58,79,.3);}',
+'.blb-set .k{font-size:14px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;}',
+'.blb-set .k small{display:block;font-size:11.5px;font-weight:500;letter-spacing:.01em;text-transform:none;opacity:.65;}',
+'.blb-set input[type=range]{pointer-events:auto;width:150px;accent-color:#0B3A4F;}',
+'.blb-set .v{font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;min-width:3.5em;text-align:right;}',
+'.blb-seg{display:inline-flex;border:2px solid var(--blb-ink);}',
+'.blb-seg button{pointer-events:auto;padding:5px 10px 6px;font-size:12px;font-weight:700;letter-spacing:.08em;',
+'  text-transform:uppercase;background:var(--blb-paper);}',
+'.blb-seg button+button{border-left:2px solid var(--blb-ink);}',
+'.blb-seg button[aria-pressed="true"]{background:var(--blb-ink);color:var(--blb-haz);}',
+'.blb-confirm{padding:12px 18px 0;}',
+'.blb-confirm p{font-size:15px;line-height:1.45;margin:0 0 12px;}',
+'.blb-confirm .row{display:flex;gap:10px;flex-wrap:wrap;}',
+'.blb-menu .blb-stamp{right:max(18px,3vw);bottom:max(18px,3vw);}',
+'.blb-menu[data-mode="pause"] .blb-stamp{display:none;}',
+'@media (max-width:760px){',
+'  .blb-mwrap{flex-direction:column;align-items:center;gap:12px;}',
+'  .blb-mpanel,.blb-msheet{align-self:stretch;width:auto;max-width:none;}',
+'  .blb-menu.sheet .blb-mpanel{display:none;}',
+'  .blb-menu{background:rgba(11,58,79,.6);}',
+'  .blb-menu .blb-stamp{display:none;}',
+'  .blb-msheet .keys{grid-template-columns:1fr;}',
+'}',
+'@media (max-height:560px){',
+'  .blb-mtitle .ar{font-size:40px;} .blb-mtitle .gl{display:none;} .blb-mnav{padding-top:10px;gap:5px;}',
+'  .blb-mbtn{padding:6px 10px 7px;} .blb-mbtn .s{display:none;}',
+'  .blb-mpanel,.blb-msheet{align-self:flex-start;}',
+'}',
+''].join('\n');
+
   /* ------------------------------------------------------------ normalizers */
   function normTiers(list) {
     const out = [];
@@ -666,6 +802,10 @@
     const onSelectTier = typeof opts.onSelectTier === 'function' ? opts.onSelectTier : function () {};
     const onStart = typeof opts.onStart === 'function' ? opts.onStart : function () {};
     const onToggleSound = typeof opts.onToggleSound === 'function' ? opts.onToggleSound : function () {};
+    // menu actions: continue | new | resume | quit | pause | setting(key, value)
+    const onMenu = typeof opts.onMenu === 'function' ? opts.onMenu : function (act) {
+      if (act === 'continue' || act === 'new' || act === 'resume') onStart();
+    };
 
     injectFonts();
     injectStyle();
@@ -741,6 +881,18 @@
     const elMm = barrow.querySelector('[data-mm]');
     stats.appendChild(barrow);
 
+    // health — the sea, a fall or an empty stomach take it; food gives it back
+    const life = el('div', 'blb-plaque blb-hp life');
+    life.innerHTML =
+      '<div class="top"><span class="k"><i class="heart"></i>Health</span>' +
+        '<span class="num" data-lifev>100</span>' +
+        '<span class="ar blb-ar">الصحّة</span></div>' +
+      '<div class="track"><div class="fill" data-lifefill></div>' +
+        '<div class="pips"><i></i><i></i><i></i><i></i><i></i></div></div>';
+    const elLifeFill = life.querySelector('[data-lifefill]');
+    const elLifeV = life.querySelector('[data-lifev]');
+    stats.appendChild(life);
+
     // stamina — the thing knefe buys back
     const hp = el('div', 'blb-plaque blb-hp');
     hp.innerHTML =
@@ -765,6 +917,42 @@
     const elWorkers = row.querySelector('[data-workers]');
     if (simple) elWorkers.parentNode.style.display = 'none';
     stats.appendChild(row);
+
+    // what you ate recently and what it is still doing for you
+    const buffs = el('div', 'blb-buffs');
+    stats.appendChild(buffs);
+    let buffKey = '';
+    function setBuffs(list) {
+      list = list || [];
+      const key = list.map(function (b) { return b.id + ':' + Math.ceil(b.t); }).join('|');
+      if (key === buffKey) return;
+      buffKey = key;
+      buffs.innerHTML = list.map(function (b) {
+        return '<span class="blb-buff">' + esc(b.label) + '<b>' + Math.ceil(b.t) + 's</b></span>';
+      }).join('');
+    }
+
+    // red edge when something hurts
+    const hurtEl = el('div', 'blb-hurt');
+    let hurtA = 0;
+    function hurt(amount) {
+      hurtA = clamp(hurtA + 0.25 + num(amount, 5) * 0.04, 0, 0.95);
+    }
+
+    // passing out: a full-screen card while the game moves you to safety
+    const faint = el('div', 'blb-faint');
+    faint.innerHTML = '<div class="ar">غمي عليك</div><div class="en">Ghme 3alék</div>' +
+      '<div class="tx" data-ftx></div><div class="bill" data-fbill></div>';
+    const elFaintTx = faint.querySelector('[data-ftx]');
+    const elFaintBill = faint.querySelector('[data-fbill]');
+    function showFaint(o) {
+      o = o || {};
+      elFaintTx.textContent = o.text || '';
+      elFaintBill.textContent = o.bill || '';
+      elFaintBill.style.display = o.bill ? 'block' : 'none';
+      faint.classList.add('on');
+    }
+    function hideFaint() { faint.classList.remove('on'); }
 
     // sea state
     const sea = el('div', 'blb-plaque blb-sea');
@@ -804,8 +992,14 @@
         'stroke-width="2.1" stroke-linecap="round"><path d="M4 9h3l5-4v14l-5-4H4z" ' +
         'fill="currentColor" stroke="none"/><path d="M16 9l6 6M22 9l-6 6"/></svg>';
     snd.addEventListener('click', function () { toggleSound(); });
+    const menuBtn = el('button', 'blb-plaque blb-menubtn', '<i></i>');
+    menuBtn.type = 'button';
+    menuBtn.title = 'Menu (Esc)';
+    menuBtn.setAttribute('aria-label', 'Pause menu');
+    menuBtn.addEventListener('click', function () { onMenu('pause'); });
     tr.appendChild(phaseTag);
     tr.appendChild(snd);
+    tr.appendChild(menuBtn);
     r.appendChild(tr);
 
     function toggleSound(force) {
@@ -1045,56 +1239,236 @@
     intro.setAttribute('aria-modal', 'true');
     intro.setAttribute('aria-label', 'Ballet l Ba7er, start');
     const K = function (k) { return '<kbd class="blb-kbd">' + k + '</kbd>'; };
+    /* The menu sits over the live scene (the game flies the camera along the
+       corniche behind it), so it is a panel, not a full-bleed poster. Main
+       mode: continue / new / how to play / settings / credits. Pause mode:
+       resume / how to play / settings / save & quit. */
+    intro.className = 'blb-menu';
+    intro.setAttribute('data-mode', 'main');
+    const MB = function (act, n, l, s, a, cls) {
+      return '<button class="blb-mbtn' + (cls ? ' ' + cls : '') + '" type="button" data-act="' + act + '">' +
+        '<span class="n">' + n + '</span><span class="l">' + l + '<span class="s">' + s + '</span></span>' +
+        '<span class="a">' + a + '</span></button>';
+    };
     intro.innerHTML =
-      '<div class="blb-ipaper">' +
-        '<div class="blb-iband blb-haz"></div>' +
-        '<div class="blb-iband b2 blb-haz"></div>' +
-        '<div class="blb-ititle">' +
-          '<div class="ar">بلّط البحر</div>' +
-          '<div class="lat">Ballet l Ba7er</div>' +
+      '<div class="blb-mwrap">' +
+        '<div class="blb-plaque blb-mpanel">' +
+          '<div class="cap blb-haz"></div>' +
+          '<div class="blb-mtitle">' +
+            '<div class="ar">بلّط البحر</div>' +
+            '<div class="lat blb-print">Ballet l Ba7er</div>' +
+            '<p class="gl">Lebanese, said to end an argument: <b>go tile the sea.</b> ' +
+              'Fine. We brought mortar.</p>' +
+          '</div>' +
+          '<div class="blb-mpause"><div class="ar">استراحة</div><div class="en">Este2a7a — paused</div></div>' +
+          '<nav class="blb-mnav">' +
+            MB('continue', '01', 'Kammel', 'continue your stretch of sea', 'كمّل', 'primary') +
+            MB('resume', '01', 'Resume', 'back to the balat', 'رجوع', 'primary') +
+            MB('new', '02', 'Balle4 men jdid', 'new game — a fresh, untiled sea', 'جديد') +
+            MB('howto', '03', 'Kif bteshtghel', 'how to play', 'كيف') +
+            MB('settings', '04', 'E3dadat', 'settings', 'إعدادات') +
+            MB('credits', '05', 'Credits', 'who is to blame', 'مين') +
+            MB('quit', '05', 'Save & quit', 'back to the main menu', 'خروج', 'warn') +
+          '</nav>' +
+          '<div class="blb-msum" data-sum></div>' +
+          '<div class="blb-iload" data-iload style="display:none">' +
+            '<div class="bar"><div class="fil blb-haz"></div></div>' +
+            '<div class="tx">Mixing the mouna 0%</div>' +
+          '</div>' +
+          '<p class="blb-mfoot">Directorate of Pointless Works, Saida sub-office. ' +
+            'Permit 1991/B. Nothing in this project is load-bearing.</p>' +
         '</div>' +
-        '<p class="blb-igloss">Lebanese, said to end an argument or a hopeless errand: ' +
-          '<b>go tile the sea.</b> Fine. We brought mortar.</p>' +
-        '<p class="blb-ipitch">Saida corniche. Two-metre slabs, laid straight out over ' +
-          'the Mediterranean. You aim down the middle of the screen, so look where the balata goes. ' +
-          'Every night the waves take your edges back. Every morning you lay more.</p>' +
-        '<div class="blb-ikeys">' +
-          '<div>' + K('WASD') + '<span>walk the corniche</span></div>' +
-          '<div>' + K('CLICK') + '<span>ballet: lay a balata</span></div>' +
-          '<div>' + K('SHIFT') + '<span>run</span></div>' +
-          '<div>' + K('HOLD CLICK') + '<span>sweep to lay a whole row</span></div>' +
-          '<div>' + K('SPACE') + '<span>jump</span></div>' +
-          '<div>' + K('HOLD E') + '<span>shovel mouna at a pile</span></div>' +
-          '<div>' + K('E') + '<span>talk to whoever is beside you</span></div>' +
-          '<div>' + K('MOUSE') + '<span>look around (click once to capture it)</span></div>' +
-          '<div>' + K('[') + K(']') + '<span>mouse sensitivity</span></div>' +
-          '<div>' + K('V') + '<span>first / third person</span></div>' +
-          '<div>' + K('SCROLL') + '<span>zoom</span></div>' +
-          '<div>' + K('M') + '<span>sound on and off</span></div>' +
-        '</div>' +
-        '<div class="blb-iload" data-iload style="display:none">' +
-          '<div class="bar"><div class="fil blb-haz"></div></div>' +
-          '<div class="tx">Mixing the mouna 0%</div>' +
-        '</div>' +
-        '<button class="blb-istart" type="button" data-start>Yalla' +
-          '<span class="ar">ابدأ</span></button>' +
-        '<p class="blb-ifoot">Issued by the Directorate of Pointless Works, Saida ' +
-          'sub-office. Permit 1991/B. Nothing in this project is load-bearing.</p>' +
-        '<div class="blb-stamp" aria-hidden="true">' +
-          '<div class="a">مجلس<br>بلاط البحر</div>' +
-          '<div class="b">Pointless<br>works</div>' +
-          '<div class="c">1991/B</div>' +
-        '</div>' +
+        '<div class="blb-plaque blb-msheet" data-sheet></div>' +
+      '</div>' +
+      '<div class="blb-stamp" aria-hidden="true">' +
+        '<div class="a">مجلس<br>بلاط البحر</div>' +
+        '<div class="b">Pointless<br>works</div>' +
+        '<div class="c">1991/B</div>' +
       '</div>';
-    const btnStart = intro.querySelector('[data-start]');
+    const btnStart = intro.querySelector('[data-act="continue"]');
     const introLoad = intro.querySelector('[data-iload]');
     const introLoadFil = introLoad.querySelector('.fil');
     const introLoadTx = introLoad.querySelector('.tx');
-    btnStart.addEventListener('click', function () {
-      if (btnStart.disabled) return;
-      hideIntro();
-      onStart();
+    const sheet = intro.querySelector('[data-sheet]');
+    const elSum = intro.querySelector('[data-sum]');
+    const menuBtns = {};
+    ['continue', 'resume', 'new', 'howto', 'settings', 'credits', 'quit'].forEach(function (a) {
+      menuBtns[a] = intro.querySelector('[data-act="' + a + '"]');
     });
+    let menuState = { mode: 'main', hasSave: false, summary: null, settings: {} };
+    let sheetName = '';
+
+    function openSheet(name) {
+      sheetName = name;
+      intro.classList.toggle('sheet', !!name);
+      if (!name) { sheet.classList.remove('on'); sheet.innerHTML = ''; return; }
+      const back = '<button class="blb-mback" type="button" data-back>← Back</button>';
+      let html = '<div class="cap blb-haz"></div>';
+      if (name === 'howto') {
+        html += '<h3>How to play <span class="ar">كيف بتشتغل</span></h3><div class="bd">' +
+          '<p>Shovel <b>mouna</b> from a pile on the corniche, walk down the stairs, and lay ' +
+          '<b>balat</b> out over the sea. Interior tiles are safe forever; the frontier is ' +
+          'where the sea fights back. The municipality pays rent on every m² still standing.</p>' +
+          '<h4>Health & stamina</h4>' +
+          '<p><b>Stamina</b> drains as you work, run and swim. <b>Health</b> is what the sea, ' +
+          'a bad fall or an empty stomach take: waves breaking over the frontier slap you, ' +
+          'cold water chills you, and swimming with no stamina left is drowning. Hit zero ' +
+          'and you pass out — someone drags you to the hospital, and the hospital sends a bill.</p>' +
+          '<h4>Eating</h4>' +
+          '<p>Two <b>food courts</b> on the corniche — Souk el Akel to the east, Sahet el Qal3a ' +
+          'by the castle — plus Knefe Jardali. Walk up to a counter and press ' + K('E') + '. ' +
+          'Cheap food is stamina, real food is health, and some of it keeps working for a while.</p>' +
+          '<h4>Controls</h4><div class="keys">' +
+          '<div>' + K('WASD') + ' walk</div><div>' + K('SHIFT') + ' run</div>' +
+          '<div>' + K('SPACE') + ' jump</div><div>' + K('CLICK') + ' lay a balata</div>' +
+          '<div>' + K('HOLD CLICK') + ' lay a row</div><div>' + K('HOLD E') + ' shovel mouna</div>' +
+          '<div>' + K('E') + ' talk / buy food</div><div>' + K('V') + ' first / third person</div>' +
+          '<div>' + K('[') + K(']') + ' mouse sensitivity</div><div>' + K('M') + ' sound</div>' +
+          '<div>' + K('ESC') + ' pause menu</div><div>' + K('SCROLL') + ' zoom</div>' +
+          '</div></div>' + back;
+      } else if (name === 'settings') {
+        const st = menuState.settings || {};
+        const seg = function (key, opts2, cur) {
+          return '<div class="blb-seg">' + opts2.map(function (o) {
+            return '<button type="button" data-set="' + key + '" data-val="' + o[0] + '" aria-pressed="' +
+              (String(cur) === String(o[0]) ? 'true' : 'false') + '">' + o[1] + '</button>';
+          }).join('') + '</div>';
+        };
+        html += '<h3>Settings <span class="ar">إعدادات</span></h3><div class="bd">' +
+          '<div class="blb-set"><div class="k">Sound<small>sea, gulls, voices</small></div>' +
+            seg('sound', [['on', 'On'], ['off', 'Off']], st.sound === false ? 'off' : 'on') + '</div>' +
+          '<div class="blb-set"><div class="k">Mouse sensitivity<small>also [ and ] in game</small></div>' +
+            '<div><input type="range" min="0.3" max="3" step="0.05" data-range="sens" value="' +
+            num(st.sens, 1) + '"> <span class="v" data-rv="sens">' + num(st.sens, 1).toFixed(2) + '×</span></div></div>' +
+          '<div class="blb-set"><div class="k">Field of view<small>wider sees more sea</small></div>' +
+            '<div><input type="range" min="45" max="80" step="1" data-range="fov" value="' +
+            num(st.fov, 58) + '"> <span class="v" data-rv="fov">' + Math.round(num(st.fov, 58)) + '°</span></div></div>' +
+          '<div class="blb-set"><div class="k">Camera<small>V switches in game</small></div>' +
+            seg('view', [['first', 'First'], ['third', 'Third']], st.view || 'first') + '</div>' +
+          '<div class="blb-set"><div class="k">Head bob<small>walking sway in first person</small></div>' +
+            seg('bob', [['on', 'On'], ['off', 'Off']], st.bob === false ? 'off' : 'on') + '</div>' +
+          '</div>' + back;
+      } else if (name === 'credits') {
+        html += '<h3>Credits <span class="ar">مين</span></h3><div class="bd">' +
+          '<p>A game of the Lebanese saying <i>ballet l ba7er</i>. Set on the Saida corniche, ' +
+          'with Qalaat al-Bahr on its causeway and Jazirat Ziri on the horizon.</p>' +
+          '<p>Every mesh, texture and sound is generated at runtime. Three.js r128 (MIT).</p>' +
+          '<h4>Made by</h4><p class="blb-links">' +
+            '<a href="' + CONTACT.github + '" target="_blank" rel="noopener">GitHub · ' +
+              esc(CONTACT.github.replace(/^https?:\/\//, '')) + '</a>' +
+            (CONTACT.linkedin ? '<a href="' + CONTACT.linkedin + '" target="_blank" rel="noopener">LinkedIn · ' +
+              esc(CONTACT.linkedin.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')) + '</a>' : '') +
+          '</p>' +
+          '<h4>Your ad on the corniche</h4>' +
+          '<p>Want your brand on the billboards along the corniche, the food-court roofs or the ' +
+            'harbour mole? Email <a href="mailto:' + CONTACT.email + '?subject=' +
+            encodeURIComponent('Billboard on Ballet l Ba7er') + '">' + CONTACT.email + '</a>.</p>' +
+          '<p>The sponsors on the billboards right now are invented. ' +
+          'The sea does not issue receipts.</p></div>' + back;
+      } else if (name === 'confirm-new') {
+        html += '<h3>Start over? <span class="ar">من جديد؟</span></h3><div class="blb-confirm">' +
+          '<p>This throws away your saved sea — every balata, every lira. The sea will ' +
+          'not notice. You might.</p><div class="row">' +
+          '<button class="blb-mbtn primary" type="button" data-act2="new"><span class="n">!</span>' +
+            '<span class="l">Yes, from scratch<span class="s">wipe the save</span></span><span class="a">إيه</span></button>' +
+          '<button class="blb-mbtn" type="button" data-back><span class="n">←</span>' +
+            '<span class="l">No, keep it<span class="s">back to the menu</span></span><span class="a">لأ</span></button>' +
+          '</div></div>';
+      }
+      sheet.innerHTML = html;
+      sheet.classList.add('on');
+      const first = sheet.querySelector('button,input');
+      try { if (first) first.focus(); } catch (e) {}
+    }
+
+    sheet.addEventListener('click', function (e) {
+      const t = e.target.closest ? e.target.closest('button') : null;
+      if (!t) return;
+      if (t.hasAttribute('data-back')) { openSheet(''); focusFirst(); return; }
+      if (t.getAttribute('data-act2') === 'new') { openSheet(''); onMenu('new'); return; }
+      const key = t.getAttribute('data-set');
+      if (key) {
+        const val = t.getAttribute('data-val');
+        Array.prototype.forEach.call(sheet.querySelectorAll('[data-set="' + key + '"]'), function (b) {
+          b.setAttribute('aria-pressed', b === t ? 'true' : 'false');
+        });
+        const v = (val === 'on') ? true : (val === 'off' ? false : val);
+        menuState.settings[key] = v;
+        onMenu('setting', { key: key, value: v });
+      }
+    });
+    sheet.addEventListener('input', function (e) {
+      const key = e.target.getAttribute && e.target.getAttribute('data-range');
+      if (!key) return;
+      const v = parseFloat(e.target.value);
+      menuState.settings[key] = v;
+      const out = sheet.querySelector('[data-rv="' + key + '"]');
+      if (out) out.textContent = key === 'fov' ? Math.round(v) + '°' : v.toFixed(2) + '×';
+      onMenu('setting', { key: key, value: v });
+    });
+
+    intro.querySelector('.blb-mnav').addEventListener('click', function (e) {
+      const b = e.target.closest ? e.target.closest('[data-act]') : null;
+      if (!b || b.disabled) return;
+      const act = b.getAttribute('data-act');
+      if (act === 'howto' || act === 'settings' || act === 'credits') {
+        openSheet(sheetName === act ? '' : act);
+        return;
+      }
+      if (act === 'new' && menuState.hasSave) { openSheet('confirm-new'); return; }
+      openSheet('');
+      onMenu(act);
+    });
+
+    function focusFirst() {
+      const b = intro.querySelector('.blb-mnav .blb-mbtn:not([hidden])');
+      try { if (b) b.focus(); } catch (e) {}
+    }
+
+    function paintMenu() {
+      const m = menuState.mode === 'pause' ? 'pause' : 'main';
+      intro.setAttribute('data-mode', m);
+      menuBtns['continue'].hidden = m !== 'main';
+      menuBtns.resume.hidden = m !== 'pause';
+      menuBtns['new'].hidden = m !== 'main';
+      menuBtns.credits.hidden = m !== 'main';
+      menuBtns.quit.hidden = m !== 'pause';
+      const cont = menuBtns['continue'];
+      cont.querySelector('.l').firstChild.textContent = menuState.hasSave ? 'Kammel' : 'Yalla';
+      cont.querySelector('.s').textContent = menuState.hasSave
+        ? 'continue your stretch of sea' : 'start tiling the sea';
+      cont.querySelector('.a').textContent = menuState.hasSave ? 'كمّل' : 'ابدأ';
+      // "new game" is only worth showing when there is something to throw away
+      if (!menuState.hasSave) menuBtns['new'].hidden = true;
+      const s = menuState.summary;
+      if (s && (s.tiles || s.lira || s.laid)) {
+        elSum.style.display = '';
+        elSum.innerHTML = '<div><b>' + fmt(s.metres || 0) + '</b>m² standing</div>' +
+          '<div><b>' + fmt(s.laid || 0) + '</b>balat laid</div>' +
+          '<div><b>' + fmt(s.lira || 0) + '</b>lira</div>';
+      } else {
+        elSum.style.display = 'none';
+      }
+    }
+
+    function showMenu(o) {
+      o = o || {};
+      menuState = {
+        mode: o.mode || menuState.mode || 'main',
+        hasSave: o.hasSave != null ? !!o.hasSave : menuState.hasSave,
+        summary: o.summary !== undefined ? o.summary : menuState.summary,
+        settings: Object.assign({}, menuState.settings, o.settings || {})
+      };
+      openSheet('');
+      paintMenu();
+      intro.classList.add('on');
+      r.classList.add('menu-open');
+      introOpen = true;
+      focusFirst();
+    }
+    paintMenu();
+    r.appendChild(hurtEl);
+    r.appendChild(faint);
     r.appendChild(intro);
 
     /* ================================================================== api */
@@ -1114,6 +1488,14 @@
         elHpFill.style.transform = 'scaleX(' + frac.toFixed(3) + ')';
         hp.classList.toggle('low', frac <= 0.25 && frac > 0);
         hp.classList.toggle('out', frac <= 0);
+      }
+      if (s.hpMax != null) S.hpMax = Math.max(1, num(s.hpMax, S.hpMax));
+      if (s.hp != null) {
+        S.hp = clamp(num(s.hp, S.hp), 0, S.hpMax || 100);
+        const lf = S.hp / (S.hpMax || 100);
+        elLifeFill.style.transform = 'scaleX(' + lf.toFixed(3) + ')';
+        elLifeV.textContent = Math.ceil(S.hp) + ' / ' + Math.round(S.hpMax || 100);
+        life.classList.toggle('low', lf <= 0.3);
       }
       if (s.unlocked != null) S.unlocked = normUnlocked(s.unlocked, tiers.length);
       if (s.tierIdx != null) S.tierIdx = clamp(num(s.tierIdx, S.tierIdx) | 0, 0, tiers.length - 1);
@@ -1297,13 +1679,11 @@
       shopOpen = false;
     }
 
-    function showIntro() {
-      intro.classList.add('on');
-      introOpen = true;
-      try { btnStart.focus(); } catch (e) {}
-    }
+    function showIntro() { showMenu({ mode: 'main' }); }
     function hideIntro() {
       intro.classList.remove('on');
+      intro.classList.remove('sheet');
+      r.classList.remove('menu-open');
       introOpen = false;
     }
 
@@ -1313,7 +1693,6 @@
         load.classList.remove('on');
         introLoad.style.display = 'none';
         btnStart.disabled = false;
-        btnStart.innerHTML = 'Yalla<span class="ar">ابدأ</span>';
         return;
       }
       loadPct = clamp(num(pct, 0), 0, 100);
@@ -1325,8 +1704,6 @@
       introLoadTx.textContent = 'Mixing the mouna ' + Math.round(loadPct) + '%';
       const ready = loadPct >= 99.5;
       btnStart.disabled = !ready;
-      if (!ready) btnStart.innerHTML = 'Mixing…';
-      else btnStart.innerHTML = 'Yalla<span class="ar">ابدأ</span>';
     }
 
     function setReticle(state) {
@@ -1337,6 +1714,10 @@
     /* ---------------------------------------------------------- frame ticker */
     function frame(dt) {
       tickSpeech(dt);
+      if (hurtA > 0.001) {
+        hurtA = Math.max(0, hurtA - num(dt, 0.016) * 1.6);
+        hurtEl.style.opacity = hurtA.toFixed(3);
+      } else if (hurtA !== 0) { hurtA = 0; hurtEl.style.opacity = '0'; }
       dt = num(dt, 0.016);
       if (dt > 1) dt /= 1000;          // tolerate milliseconds
       dt = clamp(dt, 0, 0.1);
@@ -1438,6 +1819,15 @@
       closeShop: closeShop,
       showIntro: showIntro,
       hideIntro: hideIntro,
+      showMenu: showMenu,
+      hideMenu: hideIntro,
+      isMenuOpen: function () { return introOpen; },
+      menuMode: function () { return introOpen ? menuState.mode : null; },
+      closeSheet: function () { if (sheetName) { openSheet(''); focusFirst(); return true; } return false; },
+      setBuffs: setBuffs,
+      hurt: hurt,
+      showFaint: showFaint,
+      hideFaint: hideFaint,
       setLoading: setLoading,
       frame: frame,
       // extras, all optional for the orchestrator
@@ -1803,6 +2193,20 @@
       }
     }
 
+    // a dull thump with a falling pitch: the sea, or the ground, landing on you
+    function hurt() {
+      const c = ensure(); if (busy()) return;
+      const t = c.currentTime + 0.001;
+      const o = ctx.createOscillator();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(150, t);
+      o.frequency.exponentialRampToValueAtTime(52, t + 0.22);
+      const g = envGain(t, 0.32, 0.004, 0.26);
+      o.connect(g); g.connect(master);
+      o.start(t);
+      track(o, t + 0.3);
+    }
+
     /* --------------------------------------------------------------- the sea */
     function wash(level) {
       const c = ensure(); if (!c) return;
@@ -1818,7 +2222,7 @@
 
     const sfx = {
       clack: clack, pour: pour, crumble: crumble, splash: splash,
-      gull: gull, ui: ui, purchase: purchase, wash: wash, say: voiceBlip,
+      gull: gull, ui: ui, purchase: purchase, hurt: hurt, wash: wash, say: voiceBlip,
       unlock: function () {
         const c = ensure();
         if (!c) return;

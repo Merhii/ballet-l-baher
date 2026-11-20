@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "updated": "2026-11-20",
+  "ads": [
+    {
+      "id": "mouna-abou-khalil", "active": true, "sponsor": "Mouna Abou Khalil",
+      "headline": "Cement that almost holds.", "ar": "مونة أبو خليل",
+      "tagline": "Family recipe since the last flood", "layout": "poster",
+      "bg": "#B9502F", "fg": "#EDF6F3", "accent": "#F2B733",
+      "placements": ["corniche", "souk", "qalaa", "harbour"], "weight": 3, "start": "", "end": ""
+    },
+    {
+      "id": "kaake-express", "active": true, "sponsor": "Ka3ke Express",
+      "headline": "Still warm when it reaches the corniche.", "ar": "كعكة إكسبرس",
+      "tagline": "Za3tar extra · no extra charge", "layout": "split",
+      "bg": "#E4D7B3", "fg": "#0B3A4F", "accent": "#B9502F",
+      "placements": ["corniche", "souk", "qalaa"], "weight": 2, "start": "", "end": ""
+    },
+    {
+      "id": "moteur-abou-ali", "active": true, "sponsor": "Moteur Abou Ali",
+      "headline": "Twelve hours of light. Guaranteed.*", "ar": "موتور أبو علي",
+      "tagline": "*not guaranteed", "layout": "stamp",
+      "bg": "#0B3A4F", "fg": "#F2B733", "accent": "#EDF6F3",
+      "placements": ["corniche", "harbour"], "weight": 2, "start": "", "end": ""
+    },
+    {
+      "id": "nadi-sayda", "active": true, "sponsor": "Nadi Sayda lel Sba7a",
+      "headline": "Already in the water? Might as well join.", "ar": "نادي صيدا للسباحة",
+      "tagline": "Saida swimming club · members swim free", "layout": "poster",
+      "bg": "#16708C", "fg": "#EDF6F3", "accent": "#F6C445",
+      "placements": ["harbour", "qalaa"], "weight": 1, "start": "", "end": ""
+    },
+    {
+      "id": "balat-ikhwan", "active": true, "sponsor": "Balat el Ikhwan",
+      "headline": "Our tiles survive the sea. Yours do not.", "ar": "بلاط الإخوان",
+      "tagline": "Showroom behind the Khan · ask for Fadi", "layout": "split",
+      "bg": "#EDF6F3", "fg": "#0B3A4F", "accent": "#2E7FA8",
+      "placements": ["corniche", "souk"], "weight": 1, "start": "", "end": ""
+    }
+  ]
+}

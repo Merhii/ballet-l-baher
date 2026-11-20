@@ -158,7 +158,7 @@ if (err) { console.error('FATAL loading three:', err.message); process.exit(2); 
 const THREE = sandbox.THREE;
 check('three loaded r128', () => { if (THREE.REVISION !== '128') throw new Error('rev ' + THREE.REVISION); return 'r' + THREE.REVISION; });
 
-for (const f of ['physics.js', 'world.js', 'hud.js', 'game.js']) {
+for (const f of ['ads.js', 'physics.js', 'world.js', 'hud.js', 'game.js']) {
   const p = path.join(ROOT, f);
   if (!fs.existsSync(p)) { results.push({ name: 'load ' + f, ok: false, detail: 'FILE MISSING' }); continue; }
   const e = run(p, f);
@@ -391,6 +391,45 @@ check('BLB_HUD.createAudio', () => {
 check('BLB_GAME exports go/boot', () => {
   const G = sandbox.BLB_GAME;
   if (!G || typeof G.boot !== 'function' || typeof G.go !== 'function') throw new Error('missing BLB_GAME.boot/go');
+  return 'ok';
+});
+
+check('food courts + billboard sites', () => {
+  if (!world) throw new Error('no world');
+  const fc = world.foodCourts || [];
+  if (fc.length < 2) throw new Error('expected 2 food courts, got ' + fc.length);
+  const stalls = fc.reduce((n, c) => n + c.stalls.length, 0);
+  if (stalls < 6) throw new Error('expected 6 stalls, got ' + stalls);
+  for (const c of fc) for (const s of c.stalls) {
+    if (s.z > -2 || s.z < -34 || Math.abs(s.x) > 128) throw new Error('stall off the deck: ' + s.id);
+  }
+  const slots = world.adSlots || [];
+  if (!slots.length) throw new Error('no adSlots');
+  return fc.length + ' courts, ' + stalls + ' stalls, ' + slots.length + ' billboard sites';
+});
+check('BLB_ADS schema, pick, draw', () => {
+  const A = sandbox.BLB_ADS;
+  if (!A) throw new Error('no BLB_ADS');
+  const list = A.normalize({ ads: [{ sponsor: 'X', placements: ['souk', 'bogus'], bg: 'red', weight: 99 }, {}] });
+  if (list.length !== 2) throw new Error('normalize dropped ads');
+  if (list[0].placements.join() !== 'souk') throw new Error('placements not filtered');
+  if (list[0].bg !== '#0B3A4F' || list[0].weight !== 10) throw new Error('bad field not defaulted/clamped');
+  const d = A.normalize(A.DEFAULTS);
+  for (const p of A.PLACEMENTS) if (!A.pick(d, p)) throw new Error('no default ad for ' + p);
+  if (A.pick([{ ...d[0], active: false }], 'souk')) throw new Error('inactive ad picked');
+  A.draw(document.createElement('canvas').getContext('2d'), 1024, 512, d[0]);
+  return d.length + ' default ads across ' + A.PLACEMENTS.length + ' locations';
+});
+check('HUD menu, health, faint', () => {
+  ['showMenu', 'hideMenu', 'isMenuOpen', 'setBuffs', 'hurt', 'showFaint', 'hideFaint']
+    .forEach(k => { if (typeof hud[k] !== 'function') throw new Error('missing hud.' + k); });
+  hud.showMenu({ mode: 'pause', hasSave: true, summary: { metres: 8, laid: 3, lira: 9 }, settings: { sound: true } });
+  if (!hud.isMenuOpen()) throw new Error('menu did not open');
+  hud.hideMenu();
+  hud.setStats({ hp: 40, hpMax: 100 });
+  hud.setBuffs([{ id: 'barid', label: 'Jallab · cool', t: 12 }]);
+  hud.hurt(10); hud.showFaint({ text: 'x', bill: 'y' }); hud.hideFaint();
+  hud.frame(0.016);
   return 'ok';
 });
 

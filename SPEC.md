@@ -98,6 +98,10 @@ world.update(t, dt, ctx)// ctx = { waves, camera, playerPos } — animate gulls,
 world.landColliders     // [{x1,z1,x2,z2,top}] axis-aligned boxes the player stands on / is blocked by
 world.sandPiles         // [{ x, y, z, kind:'sand'|'cement'|'gravel' }] on the deck, y=1.5
 world.kiosk             // { x, y, z } the muallim's kiosk on the deck (upgrade shop trigger)
+world.foodCourts        // [{ id, name, ar, x, y, z, stalls:[{ id, ar, x, y, z }] }] — stall id = food id;
+                        //   (x, z) is where the customer stands, the vendor is 3.1 m inland of it
+world.adSlots           // [{ id, placement, x, base, y, z, ry, w, h }] billboard sites; the game hangs
+                        //   the boards. placement ∈ corniche|souk|qalaa|harbour (see ads.js)
 world.heckler           // { x, y, z } where the heckling uncle stands (on the deck, by the railing)
 world.dispose()
 ```

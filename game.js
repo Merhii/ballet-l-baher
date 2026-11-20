@@ -41,6 +41,77 @@
   var SOAK_HIT = 7;           // one-off, the moment the sea gets you
   var KNEFE_PRICE = 25;
   var KNEFE_HEAL = 45;
+
+  /* Health is separate from stamina: stamina is how much work is left in you,
+     health is what the sea, a fall or an empty stomach take. At zero you pass
+     out and wake on the corniche with a hospital bill. */
+  var HP_MAX = 100;
+  var HP_COLD = 0.35;          // per second in November water
+  var HP_DROWN = 6.5;          // per second in water with no stamina left
+  var HP_STARVE = 0.6;         // per second on land with no stamina left
+  var HP_REGEN = 0.35;         // per second while well rested
+  var FALL_SAFE = 11;          // landing speed (m/s) you walk away from
+  var RESPAWN_HP = 60;
+
+  /* What the food courts sell. `sta` is stamina, `hp` health, `buff` keeps
+     working after you eat. Knefe stays at Jardali's. */
+  var FOODS = {
+    knefe:    { name: 'Knefe b jebne',   ar: 'كنافة',   price: KNEFE_PRICE, sta: KNEFE_HEAL, hp: 10 },
+    manoushe: { name: 'Manoushe za3tar', ar: 'منقوشة',  price: 8,  sta: 18, hp: 4 },
+    falafel:  { name: 'Falafel sandwich', ar: 'فلافل',  price: 12, sta: 24, hp: 10 },
+    shawarma: { name: 'Shawarma',        ar: 'شاورما',  price: 30, sta: 35, hp: 22,
+                buff: { id: 'shab3an', label: 'Shab3an · heals', t: 60 } },
+    samke:    { name: 'Sayyadiyeh',      ar: 'صيّادية', price: 40, sta: 25, hp: 45 },
+    jallab:   { name: 'Jallab',          ar: 'جلّاب',   price: 6,  sta: 10, hp: 0,
+                buff: { id: 'barid', label: 'Jallab · cool', t: 90 } },
+    kaake:    { name: 'Ka3ke',           ar: 'كعكة',    price: 5,  sta: 12, hp: 2 }
+  };
+
+  /* The people behind the food-court counters, keyed by what they sell. */
+  var VENDORS = {
+    manoushe: { name: 'Abou Fadi', voice: 1, hat: 'cap', shirt: 0xe8e2d4, hatCol: 0x3f6b3a, lines: {
+      greet: [{ t: 'Manoushe? Lessa tal3a mn el furn.', ar: 'طالعة من الفرن' }],
+      idle: [{ t: 'Za3tar men el jabal. Zét men el day3a.', ar: 'زعتر من الجبل' },
+             { t: 'Kol, ba3dén ballet. Hék el tartib.', ar: 'هيك الترتيب' }],
+      sold: [{ t: 'Sa7tein. Ma fi a7la.', ar: 'صحتين' }, { t: 'Hay ma3 khyar w na3na3.', ar: 'خيار ونعنع' }],
+      pricey: [{ t: 'Tmen lira. Ballet shwayy w rja3.', ar: 'تمن ليرات' }],
+      full: [{ t: 'Inta mesh ja3an. Ana ba3ref.', ar: 'مش جوعان' }] } },
+    shawarma: { name: 'Ziad', voice: 2, hat: 'cap', shirt: 0xb9502f, hatCol: 0x8c4a2f, lines: {
+      greet: [{ t: 'Djej aw la7me? Fi toum ktir.', ar: 'دجاج أو لحمة؟' }],
+      idle: [{ t: 'El sikh 3am ydour men el sob7.', ar: 'السيخ عم يدور' },
+             { t: 'Ma bta3ref tballet 3a ma3de faadye.', ar: 'معدة فاضية' }],
+      sold: [{ t: 'Hay. Btedfik sa3a.', ar: 'بتدفّيك ساعة' }, { t: 'Toum ziyéde, ma 2ellak la 7ada.', ar: 'توم زيادة' }],
+      pricey: [{ t: 'Tlétin lira ya 3ammi. Mesh balash.', ar: 'تلاتين ليرة' }],
+      full: [{ t: 'Wa2ef, wa2ef. Kelt ktir.', ar: 'كلت كتير' }] } },
+    falafel: { name: 'Im Rami', voice: 3, hat: 'scarf', shirt: 0x3b5c73, hatCol: 0xf2b733, lines: {
+      greet: [{ t: 'Falafel skhoun, ya habibi.', ar: 'فلافل سخنة' }],
+      idle: [{ t: 'Tarator men 3ende. El wasfe sirr.', ar: 'الوصفة سر' },
+             { t: 'Ibni kamén kén ballet. Halla2 bi Dubai.', ar: 'هلّق بدبي' }],
+      sold: [{ t: 'Sa7tein 3a 2albak.', ar: 'صحتين على قلبك' }, { t: 'Zedtellak wa7de. Ma t2oul.', ar: 'زدتلّك وحدة' }],
+      pricey: [{ t: 'Tna3sh lira. Ta3a ba3dén.', ar: 'تنعش ليرة' }],
+      full: [{ t: 'Shab3an? Mnih. Rou7 shtghol.', ar: 'شبعان؟' }] } },
+    samke: { name: 'Abou Hassan', voice: 0, hat: 'none', shirt: 0x16708c, hatCol: 0x2b2420, lines: {
+      greet: [{ t: 'Samak el yom. Wallah el yom.', ar: 'سمك اليوم' }],
+      idle: [{ t: 'Sayyadiyeh b ruz w basal. Mitl ayyém zamén.', ar: 'متل أيام زمان' },
+             { t: 'El ba7er bya3tik samak. W byekhod balat. 3adel.', ar: 'عادل' }],
+      sold: [{ t: 'Kol. Hay bterja3lak el rou7.', ar: 'بترجعلك الروح' }],
+      pricey: [{ t: 'Arb3in lira. El samak ghali hal sene.', ar: 'السمك غالي' }],
+      full: [{ t: 'Ma fi 3a2el ykoun shab3an w ja3an.', ar: 'شبعان' }] } },
+    jallab: { name: 'Hamoudi', voice: 4, hat: 'cap', shirt: 0xf2b733, hatCol: 0x0b3a4f, lines: {
+      greet: [{ t: 'Jallab b talj w snawbar!', ar: 'جلّاب بتلج' }],
+      idle: [{ t: 'Bel shob, jallab. Bel bard, kamén jallab.', ar: 'كمان جلّاب' },
+             { t: 'Ana 3am bkhabbi el talj men el shames.', ar: 'عم خبّي التلج' }],
+      sold: [{ t: 'Barid! Hayda ybarridak sa3a w nos.', ar: 'بيبرّدك' }],
+      pricey: [{ t: 'Sett lira bas. Ma 3andak sett lira?', ar: 'ست ليرات' }],
+      full: [{ t: 'Khalas, ma3dtak meliye.', ar: 'معدتك مليانة' }] } },
+    kaake: { name: 'Abou Khaled', voice: 1, hat: 'hard', shirt: 0xe4d7b3, hatCol: 0xb9502f, lines: {
+      greet: [{ t: 'Ka3ke! Ka3ke b za3tar!', ar: 'كعكة!' }],
+      idle: [{ t: 'Sar-li tlétin sene b2ool "ka3ke". Wala marra ghayyart.', ar: 'تلاتين سنة' },
+             { t: 'El ka3ke ma btekhla2 bala ba7er.', ar: 'بلا بحر' }],
+      sold: [{ t: 'Khod. W hay za3tar 3a jamb.', ar: 'زعتر ع جنب' }],
+      pricey: [{ t: 'Khams lira. Iza ma ma3ak, ballet.', ar: 'خمس ليرات' }],
+      full: [{ t: 'Khodha ma3ak la ba3dén. La2, mesh balash.', ar: 'مش ببلاش' }] } }
+  };
   var PAY_PER_BALATA = 3;     // the more you tile, the more you make
   var PAY_PER_SURVIVING = 1;  // and the inspection pays rent on what holds
 
@@ -442,14 +513,33 @@
     var fx = BLB_PHYSICS.createSplashes(THREE, { palette: P });
     scene.add(fx.object);
 
+    // ---- settings, kept per browser
+    var SET = { sound: true, sens: 1, fov: 58, view: 'first', bob: true };
+    try {
+      var rawSet = JSON.parse(localStorage.getItem('blb.settings') || 'null');
+      if (rawSet) {
+        for (var sk in SET) { if (rawSet.hasOwnProperty(sk)) SET[sk] = rawSet[sk]; }
+      } else {
+        var oldSens = parseFloat(localStorage.getItem('blb.sens'));
+        if (oldSens > 0.0004 && oldSens < 0.02) SET.sens = oldSens / 0.0022;
+      }
+    } catch (e) { /* private window */ }
+    function saveSettings() {
+      try { localStorage.setItem('blb.settings', JSON.stringify(SET)); } catch (e) { /* ignore */ }
+    }
+
     var hud = BLB_HUD.create({
       root: overlay, palette: PCSS, tiers: HUD_TIERS, simple: true,
       onSelectTier: function () {},
       onStart: function () { start(); },
-      onToggleSound: function (on) { sfx.muted = !on; },
+      // the HUD's speaker button reports `muted`
+      onToggleSound: function (muted) { sfx.muted = !!muted; SET.sound = !muted; saveSettings(); },
+      onMenu: function (act, v) { onMenu(act, v); },
       keys: false
     });
     var sfx = BLB_HUD.createAudio();
+    sfx.muted = !SET.sound;
+    if (hud.setMuted) hud.setMuted(!SET.sound);
 
     // ---- player
     var mason = createMason(P.SHIRT, P.HAZARD);
@@ -462,6 +552,7 @@
     var S = {
       mortar: 6, mortarMax: MORTAR_MAX,
       health: HEALTH_MAX, lira: 0, knefeEaten: 0,
+      hp: HP_MAX, buffs: {}, fainted: 0, faintCause: '', faints: 0,
       elapsed: 0, started: false, laid: 0, lost: 0,
       nextInspection: INSPECTION_EVERY, nextHeckle: 24, squall: false, phase: '',
       wasInWater: false
@@ -483,7 +574,10 @@
        `tpPitch`/`dist` only matter in the optional third-person view on V. */
     var EYE = 1.62;
     var cam = { yaw: Math.PI, pitch: -0.06, tpPitch: 0.52, dist: 15 };
-    var firstPerson = true;
+    var firstPerson = SET.view !== 'third';
+    var paused = false;
+    camera.fov = clamp(+SET.fov || 58, 45, 80);
+    camera.updateProjectionMatrix();
     var bobT = 0, bobY = 0, bobRoll = 0;
     var camPos = new THREE.Vector3(), camTarget = new THREE.Vector3();
     camera.rotation.order = 'YXZ';
@@ -521,12 +615,8 @@
        does allow it); drag-to-look is only the fallback. Crucially we do NOT
        give up on the lock after one refusal — a single mistimed gesture used to
        demote the whole session to dragging. */
-    var fp = { locked: false, giveUp: false, failures: 0, dragX: 0, dragY: 0, dragging: false };
-    var look = { sens: 0.0022, drag: 0.0042 };
-    try {
-      var savedSens = parseFloat(localStorage.getItem('blb.sens'));
-      if (savedSens > 0.0004 && savedSens < 0.02) look.sens = savedSens;
-    } catch (e) { /* private window */ }
+    var fp = { locked: false, giveUp: false, failures: 0, dragX: 0, dragY: 0, dragging: false, expectUnlock: false };
+    var look = { sens: 0.0022 * clamp(+SET.sens || 1, 0.3, 3), drag: 0.0042 };
 
     function aimNDC() { return firstPerson ? CENTRE : mouseNDC; }
     var CENTRE = new THREE.Vector2(0, 0);
@@ -546,65 +636,122 @@
       document.body.appendChild(hint);
     })();
     function updateHint() {
-      var show = !IS_TOUCH && S.started && firstPerson && !fp.locked;
-      hint.textContent = fp.giveUp ? 'drag to look around' : 'click to look around';
+      // the view follows the mouse anyway; the hint only offers the capture
+      var show = !IS_TOUCH && !fp.giveUp && S.started && !paused && !S.fainted && firstPerson && !fp.locked;
+      hint.textContent = 'click to capture the mouse';
       hint.classList.toggle('on', show);
+      // the on-screen sticks sit above the HUD layer, so they must get out of the menu's way
+      if (touchWrap) touchWrap.style.display = (S.started && !paused) ? '' : 'none';
       canvas.style.cursor = (firstPerson && fp.locked) ? 'none' : '';
+    }
+
+    // where the (uncaptured) mouse is, for free look's edge turning
+    var ptr = { x: 0, y: 0, inside: false };
+    document.addEventListener('mouseleave', function () { ptr.inside = false; });
+    window.addEventListener('blur', function () { ptr.inside = false; });
+    function freeLookOn() {
+      return !IS_TOUCH && firstPerson && !fp.locked && S.started && !paused && !S.fainted &&
+        !(hud.isMenuOpen && hud.isMenuOpen());
+    }
+    function edgeTurn(dt) {
+      if (!freeLookOn() || !ptr.inside) return;
+      // sideways only: pitch has a short range the mouse covers anyway, and the
+      // top edge is where the HUD's buttons live
+      var W = window.innerWidth, edge = Math.max(36, W * 0.05);
+      var kx = ptr.x < edge ? (edge - ptr.x) / edge : (ptr.x > W - edge ? -(ptr.x - (W - edge)) / edge : 0);
+      if (kx) cam.yaw += clamp(kx, -1, 1) * 2.2 * (look.sens / 0.0022) * dt;
     }
 
     function requestLook() {
       if (IS_TOUCH) { fp.giveUp = true; return; }   // nothing to capture on a phone
       if (!firstPerson || fp.locked) return;
       if (!canvas.requestPointerLock) { fp.giveUp = true; updateHint(); return; }
-      try { canvas.requestPointerLock(); } catch (err) { fp.failures++; }
+      try {
+        // newer browsers return a promise and reject it instead of throwing
+        var lockReq = canvas.requestPointerLock();
+        if (lockReq && typeof lockReq.catch === 'function') lockReq.catch(function () { /* counted below */ });
+      } catch (err) { fp.failures++; }
       setTimeout(function () {
         if (fp.locked) return;
         fp.failures++;
         if (fp.failures >= 2 && !fp.giveUp) {
           fp.giveUp = true;
-          hud.toast('Mouse capture blocked here — drag to look instead.', 'info');
+          hud.toast('Mouse capture blocked here — the view still follows the mouse; hold it at a screen edge to keep turning.', 'info');
         }
         updateHint();
       }, 500);
     }
     document.addEventListener('pointerlockchange', function () {
+      var was = fp.locked;
       fp.locked = (document.pointerLockElement === canvas);
       if (fp.locked) { fp.failures = 0; fp.giveUp = false; }
+      // Esc while the mouse is captured never reaches us as a key: the browser
+      // just drops the lock. Losing it unasked is how the player pauses.
+      if (was && !fp.locked && !fp.expectUnlock && S.started && !paused && !S.fainted) pause();
+      fp.expectUnlock = false;
       updateHint();
     });
+    function releaseLook() {
+      if (fp.locked && document.exitPointerLock) { fp.expectUnlock = true; document.exitPointerLock(); }
+    }
     document.addEventListener('pointerlockerror', function () {
       fp.failures++;
       if (fp.failures >= 2) fp.giveUp = true;
       updateHint();
     });
 
-    function setSens(v) {
-      look.sens = clamp(v, 0.0006, 0.0090);
-      try { localStorage.setItem('blb.sens', String(look.sens)); } catch (e) { /* ignore */ }
-      hud.toast('Mouse sensitivity ' + (look.sens / 0.0022).toFixed(2) + '×', 'info');
+    function setSens(v, quiet) {
+      look.sens = clamp(v, 0.0006, 0.0066);
+      SET.sens = +(look.sens / 0.0022).toFixed(2);
+      saveSettings();
+      if (!quiet) hud.toast('Mouse sensitivity ' + SET.sens.toFixed(2) + '×', 'info');
+    }
+
+    function setView(first, quiet) {
+      firstPerson = !!first;
+      SET.view = firstPerson ? 'first' : 'third';
+      saveSettings();
+      mason.group.visible = !firstPerson;
+      viewModel.visible = firstPerson;
+      if (!firstPerson) releaseLook();
+      if (!quiet) hud.toast(firstPerson ? 'First person' : 'Third person', 'info');
+      updateHint();
+    }
+
+    function setSound(on) {
+      SET.sound = !!on;
+      sfx.muted = !SET.sound;
+      if (hud.setMuted) hud.setMuted(!SET.sound);
+      saveSettings();
     }
 
     function onKey(e, down) {
       var c = e.code;
       var was = keys[c];
+      if (down && (c === 'Escape' || c === 'KeyP')) {
+        if (!was) {
+          if (hud.isMenuOpen && hud.isMenuOpen()) {
+            if (hud.closeSheet && hud.closeSheet()) { /* stepped back out of a sub-page */ }
+            else if (paused) resume();
+          } else if (S.started && !S.fainted) {
+            pause();
+          }
+        }
+        keys[c] = down;
+        return;
+      }
+      if (hud.isMenuOpen && hud.isMenuOpen()) { keys[c] = false; return; }
       keys[c] = down;
       if (!down) return;
+      if (S.fainted) return;
       if (c === 'KeyE' && !was && S.started) {
         var near = nearestNPC();
         if (near) { talkTo(near.npc); return; }   // E is talk when someone is beside you
       }
-      if (c === 'KeyV') {
-        firstPerson = !firstPerson;
-        mason.group.visible = !firstPerson;
-        viewModel.visible = firstPerson;
-        if (!firstPerson && document.exitPointerLock) document.exitPointerLock();
-        hud.toast(firstPerson ? 'First person' : 'Third person', 'info');
-        updateHint();
-      }
+      if (c === 'KeyV') setView(!firstPerson);
       if (c === 'BracketLeft') { setSens(look.sens * 0.84); return; }
       if (c === 'BracketRight') { setSens(look.sens * 1.19); return; }
-      if (c === 'KeyM') { sfx.muted = !sfx.muted; hud.toast(sfx.muted ? 'Sound off' : 'Sound on', 'info'); }
-      else if (c === 'Escape') hud.closeShop();
+      if (c === 'KeyM') { setSound(!SET.sound); hud.toast(SET.sound ? 'Sound on' : 'Sound off', 'info'); }
       if (c === 'Space') e.preventDefault();
     }
     window.addEventListener('keydown', function (e) { onKey(e, true); });
@@ -624,21 +771,25 @@
         orbiting = true; lastPX = e.clientX; lastPY = e.clientY;
         return;
       }
-      if (firstPerson && !fp.locked) {
-        /* Ask for the mouse AND start drag-looking in the same gesture. If the
-           lock is granted the drag never matters; if it is refused the player
-           is already looking around instead of clicking into a dead screen. */
+      if (firstPerson && !fp.locked && e.pointerType !== 'mouse') {
+        // touch: a finger on the scene drags the view; a tap still lays
         requestLook();
         orbiting = true; lastPX = e.clientX; lastPY = e.clientY;
         placing = false;
         return;
+      }
+      if (firstPerson && !fp.locked) {
+        /* Mouse: the view already follows the mouse (free look), so a click is
+           always a click — it lays a balata — and it also asks for the capture,
+           which only removes the cursor and the screen-edge limit. */
+        requestLook();
       }
       placing = true;
       tryPlace(true);
     });
     window.addEventListener('pointerup', function (e) {
       if (e.button === 2 || e.button === 1) { orbiting = false; return; }
-      if (firstPerson && !fp.locked) {
+      if (firstPerson && !fp.locked && e.pointerType !== 'mouse') {
         orbiting = false;
         // a click that did not travel still lays a balata
         if (!fp.dragging) tryPlace(true);
@@ -655,6 +806,17 @@
         if (my > 140) my = 140; else if (my < -140) my = -140;
         cam.yaw -= mx * look.sens;
         cam.pitch = clamp(cam.pitch - my * look.sens, -1.35, 1.35);
+        return;
+      }
+      ptr.x = e.clientX; ptr.y = e.clientY; ptr.inside = true;
+      if (freeLookOn() && e.pointerType === 'mouse' && !orbiting) {
+        /* Free look without the capture: the view follows the mouse, no button
+           held. Holding the pointer against an edge keeps turning (see tick). */
+        var fx = e.movementX || 0, fy = e.movementY || 0;
+        if (fx > 140) fx = 140; else if (fx < -140) fx = -140;
+        if (fy > 140) fy = 140; else if (fy < -140) fy = -140;
+        cam.yaw -= fx * look.sens;
+        cam.pitch = clamp(cam.pitch - fy * look.sens, -1.35, 1.35);
         return;
       }
       if (orbiting) {
@@ -686,10 +848,11 @@
 
     // ---- touch: left thumb walks, right thumb looks, buttons do the work
     var touch = { moveX: 0, moveZ: 0, lookId: -1, moveId: -1, ox: 0, oy: 0 };
-    var tTalk = null;
+    var tTalk = null, touchWrap = null;
     if (IS_TOUCH) buildTouchControls();
     function buildTouchControls() {
       var wrap = document.createElement('div');
+      touchWrap = wrap;
       wrap.id = 'touchlayer';
       wrap.innerHTML =
         '<div id="tstick"><div id="tnub"></div></div>' +
@@ -820,8 +983,9 @@
       // whoever is closer wins the E key
       if (tTalk) tTalk.style.display = who ? 'block' : 'none';
       if (who && (!pile || who.dist < 2.6)) {
-        var label = who.npc.def.sells === 'knefe'
-          ? 'knefe · ' + KNEFE_PRICE + ' l.l.'
+        var food = who.npc.def.sells && FOODS[who.npc.def.sells];
+        var label = food
+          ? food.name.toLowerCase() + ' · ' + food.price + ' l.l.'
           : 'talk to ' + who.npc.def.name;
         hud.setPrompt(IS_TOUCH ? label : 'E — ' + label);
       } else if (pile && keys.KeyE) {
@@ -1029,6 +1193,20 @@
       }
     ];
 
+    // the food-court vendors, one behind each counter the world built
+    (world.foodCourts || []).forEach(function (court) {
+      (court.stalls || []).forEach(function (stall) {
+        var v = VENDORS[stall.id];
+        if (!v || !FOODS[stall.id]) return;
+        NPC_DEFS.push({
+          id: 'vendor-' + stall.id, name: v.name, voice: v.voice, hat: v.hat, scale: 1.0,
+          shirt: v.shirt, hatCol: v.hatCol, yaw: 0, sells: stall.id, court: court.name,
+          at: function () { return { x: stall.x, y: DECK_Y, z: stall.z - 3.1 }; },
+          lines: v.lines
+        });
+      });
+    });
+
     function angleTo(a, b, k) {
       var d = ((b - a + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
       return a + d * k;
@@ -1100,26 +1278,39 @@
        Im Kamel hands you mouna on the lines where she offers it. */
     /* Jardali has no conversation of his own: pressing E at his counter buys
        the knefe, and which line he gives you depends on how it went. */
-    function buyKnefe(npc) {
-      var kind;
-      if (S.health >= HEALTH_MAX - 0.5) {
+    /* Everyone who sells food works the same way: E at the counter buys one.
+       Jardali alone will feed you for free when you are about to fold. */
+    function eat(food) {
+      S.health = clamp(S.health + food.sta, 0, HEALTH_MAX);
+      S.hp = clamp(S.hp + food.hp, 0, HP_MAX);
+      if (food.buff) S.buffs[food.buff.id] = food.buff.t;
+      S.knefeEaten++;
+      sfx.purchase();
+      pushStats();
+    }
+    function foodToast(food, paid) {
+      var bits = [food.name + '.'];
+      if (food.sta) bits.push('+' + food.sta + ' stamina');
+      if (food.hp) bits.push('+' + food.hp + ' health');
+      if (food.buff) bits.push(food.buff.label.split('·')[1].trim() + ' ' + food.buff.t + 's');
+      bits.push(paid ? '−' + food.price + ' l.l.' : 'on the house');
+      return bits.join(' · ');
+    }
+    function buyFood(npc) {
+      var food = FOODS[npc.def.sells], kind;
+      var stuffed = S.health >= HEALTH_MAX - 0.5 && S.hp >= HP_MAX - 0.5 && !food.buff;
+      if (stuffed) {
         kind = 'full';
-      } else if (S.lira >= KNEFE_PRICE) {
-        S.lira -= KNEFE_PRICE;
-        S.health = clamp(S.health + KNEFE_HEAL, 0, HEALTH_MAX);
-        S.knefeEaten++;
+      } else if (S.lira >= food.price) {
+        S.lira -= food.price;
+        eat(food);
         kind = 'sold';
-        sfx.purchase();
-        hud.toast('Knefe b jebne. +' + KNEFE_HEAL + ' · −' + KNEFE_PRICE + ' l.l.', 'good');
-        pushStats();
-      } else if (S.health <= 25) {
+        hud.toast(foodToast(food, true), 'good');
+      } else if (npc.def.sells === 'knefe' && (S.health <= 25 || S.hp <= 25)) {
         // he is not going to watch you fold over 25 lira
-        S.health = clamp(S.health + KNEFE_HEAL, 0, HEALTH_MAX);
-        S.knefeEaten++;
+        eat(food);
         kind = 'broke';
-        sfx.purchase();
-        hud.toast('3a 7sabe — on the house.', 'good');
-        pushStats();
+        hud.toast('3a 7sabe — ' + foodToast(food, false), 'good');
       } else {
         kind = 'pricey';
         sfx.ui();
@@ -1130,7 +1321,7 @@
     }
 
     function talkTo(npc) {
-      if (npc.def.sells === 'knefe') return buyKnefe(npc);
+      if (npc.def.sells) return buyFood(npc);
       var pool = npc.def.talk;
       if (!pool || !pool.length) return;
       var at = npc.talkIdx % pool.length;
@@ -1234,6 +1425,312 @@
       hud.heckle(pick(list));
     }
 
+    // ----------------------------------------------------------- billboards
+    /* The world says where the boards stand; we hang them and paint them from
+       the ad list the CMS publishes (ads.json, or a preview it pushed into
+       this browser). Each board turns over every ~25 s with a flip, and an
+       impression is counted once per showing, when the board is on screen. */
+    var ADS = window.BLB_ADS;
+    var adList = ADS ? ADS.normalize(ADS.DEFAULTS) : [];
+    var adSource = 'defaults';
+    var HOUSE_AD = {
+      id: 'house', sponsor: 'Your ad here', ar: 'إعلانك هون',
+      headline: 'This board is free. Put your brand on the corniche.', tagline: 'mmerhikarim@gmail.com',
+      layout: 'poster', bg: '#E4D7B3', fg: '#0B3A4F', accent: '#F2B733'
+    };
+    var boards = [];
+    (function buildBoards() {
+      var slots = world.adSlots || [];
+      if (!slots.length || !ADS) return;
+      var postMat = new THREE.MeshPhongMaterial({ color: P.CEMENT, flatShading: true, shininess: 4, specular: 0x111111 });
+      var frameMat = new THREE.MeshPhongMaterial({ color: P.SEA_DEEP, flatShading: true, shininess: 10, specular: 0x222222 });
+      var lampMat = new THREE.MeshBasicMaterial({ color: P.SUN });
+      for (var n = 0; n < slots.length; n++) {
+        var s = slots[n];
+        var g = new THREE.Group();
+        g.position.set(s.x, 0, s.z);
+        g.rotation.y = s.ry || 0;
+        var legH = s.y - s.base + s.h * 0.5;
+        for (var side = -1; side <= 1; side += 2) {
+          var leg = new THREE.Mesh(new THREE.BoxGeometry(0.28, legH, 0.28), postMat);
+          leg.position.set(side * s.w * 0.32, s.base + legH / 2, -0.22);
+          g.add(leg);
+        }
+        var frame = new THREE.Mesh(new THREE.BoxGeometry(s.w + 0.42, s.h + 0.42, 0.24), frameMat);
+        frame.position.set(0, s.y + s.h / 2, -0.06);
+        g.add(frame);
+        var lamp = new THREE.Mesh(new THREE.BoxGeometry(s.w * 0.8, 0.12, 0.3), lampMat);
+        lamp.position.set(0, s.y + s.h + 0.3, 0.2);
+        g.add(lamp);
+        var cv = document.createElement('canvas');
+        cv.width = 1024; cv.height = 512;
+        var tx = new THREE.CanvasTexture(cv);
+        tx.encoding = THREE.sRGBEncoding;
+        tx.anisotropy = 4;
+        var face = new THREE.Mesh(new THREE.PlaneGeometry(s.w, s.h),
+          new THREE.MeshBasicMaterial({ map: tx, toneMapped: false }));
+        face.position.set(0, s.y + s.h / 2, 0.08);
+        g.add(face);
+        scene.add(g);
+        // the deck legs are solid; roof and mole boards are out of reach anyway
+        if (s.base <= DECK_Y + 0.01 && world.landColliders) {
+          for (var sd = -1; sd <= 1; sd += 2) {
+            var lx = s.x + Math.cos(s.ry || 0) * sd * s.w * 0.32, lz = s.z;
+            world.landColliders.push({ x1: lx - 0.25, z1: lz - 0.45, x2: lx + 0.25, z2: lz + 0.05, top: DECK_Y + legH + 2 });
+          }
+        }
+        boards.push({
+          slot: s, group: g, face: face, canvas: cv, ctx: cv.getContext('2d'), tex: tx,
+          ad: null, next: 2 + n * 4.5, flip: 0, painted: false, counted: false, seen: 0
+        });
+      }
+    })();
+
+    function paintBoard(b) {
+      try { ADS.draw(b.ctx, 1024, 512, b.ad || HOUSE_AD); } catch (e) { /* bad copy never kills the game */ }
+      b.tex.needsUpdate = true;
+      b.counted = false; b.seen = 0;
+    }
+    function nextAd(b) {
+      b.ad = ADS.pick(adList, b.slot.placement, b.ad && b.ad.id) || null;
+      paintBoard(b);
+    }
+    function setAds(list, source) {
+      adList = list || [];
+      adSource = source || 'ads.json';
+      for (var i = 0; i < boards.length; i++) nextAd(boards[i]);
+    }
+    if (ADS && boards.length) {
+      setAds(adList, 'defaults');
+      ADS.load(function (list, source) {
+        setAds(list, source);
+        if (source === 'preview') hud.toast('Billboards: showing the CMS preview.', 'info');
+      });
+      // fonts arrive after the first paint; repaint so Arabic is real Arabic
+      if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(function () { boards.forEach(paintBoard); }).catch(function () {});
+      }
+      // the CMS in another tab can push a new preview while we are running
+      window.addEventListener('storage', function (e) {
+        if (e.key !== ADS.PREVIEW_KEY) return;
+        ADS.load(function (list, source) { setAds(list, source); hud.toast('Billboards updated from the CMS.', 'info'); });
+      });
+    }
+    var boardV = new THREE.Vector3();
+    function updateBoards(dt) {
+      if (!boards.length) return;
+      for (var i = 0; i < boards.length; i++) {
+        var b = boards[i];
+        b.next -= dt;
+        if (b.next <= 0 && b.flip === 0) b.flip = 1;
+        if (b.flip > 0) {
+          // fold the face shut, swap the poster at the halfway point, open it
+          var before = b.flip;
+          b.flip = Math.max(0, b.flip - dt * 2.2);
+          if (before > 0.5 && b.flip <= 0.5) nextAd(b);
+          b.face.scale.y = Math.max(0.02, Math.abs(b.flip - 0.5) * 2);
+          if (b.flip === 0) { b.face.scale.y = 1; b.next = 24 + Math.random() * 8; }
+        }
+        // impression: on screen, near enough to read, for over a second
+        if (!b.counted && b.ad && b.ad.id !== 'house') {
+          boardV.set(b.slot.x, b.slot.y + b.slot.h / 2, b.slot.z);
+          var dist = boardV.distanceTo(camera.position);
+          boardV.project(camera);
+          var vis = boardV.z < 1 && Math.abs(boardV.x) < 0.95 && Math.abs(boardV.y) < 0.95 &&
+            dist < 34 * Math.max(b.slot.w / 8, 1);
+          b.seen = vis ? b.seen + dt : 0;
+          if (b.seen > 1.2 && S.started) { b.counted = true; ADS.bump(b.ad.id); }
+        }
+      }
+    }
+
+    // ------------------------------------------------------------- health
+    var hurtBucket = 0, hurtCool = 0, slamCool = 0;
+    function damage(amount, cause) {
+      if (!S.started || S.fainted || amount <= 0) return;
+      S.hp = Math.max(0, S.hp - amount);
+      S.faintCause = cause || S.faintCause;
+      hurtBucket += amount;
+      if (hurtBucket >= 2.5 && hurtCool <= 0) {
+        hud.hurt(hurtBucket);
+        if (sfx.hurt) sfx.hurt();
+        hurtBucket = 0; hurtCool = 0.5;
+      }
+      pushStats();
+      if (S.hp <= 0) faint();
+    }
+
+    var FAINT_LINES = {
+      drown: 'Abou Hassan\'s nephew pulled you out by the fanella.',
+      fall: 'You found the ground faster than you planned.',
+      sea: 'The sea came over the edge and won that round.',
+      starve: 'You worked until you folded, on an empty stomach.',
+      cold: 'November water. You stayed in too long.'
+    };
+    function faint() {
+      if (S.fainted) return;
+      S.fainted = 4.2;
+      S.faints++;
+      placing = false; keys = {};
+      var bill = Math.min(Math.floor(S.lira), 20 + Math.round(S.lira * 0.15));
+      S.lira -= bill;
+      var spilt = Math.floor(S.mortar / 2);
+      S.mortar -= spilt;
+      releaseLook();
+      hud.setPrompt(null);
+      hud.showFaint({
+        text: (FAINT_LINES[S.faintCause] || FAINT_LINES.starve) +
+          (spilt > 0 ? ' Half the barrow went with you.' : ''),
+        bill: bill > 0 ? 'Hospital bill · ' + bill + ' l.l.' : 'Hospital bill · waived. You had nothing.'
+      });
+      npcEvent('spent');
+      pushStats();
+    }
+    function wakeUp() {
+      S.fainted = 0;
+      S.hp = RESPAWN_HP;
+      S.health = Math.max(S.health, 55);
+      S.faintCause = '';
+      body.teleport(0, DECK_Y, -11);
+      body.vel.set(0, 0, 0);
+      cam.yaw = Math.PI; cam.pitch = -0.06;
+      hud.hideFaint();
+      hud.toast('Back on the corniche. Eat something.', 'info');
+      updateHint();
+      pushStats();
+    }
+
+    var cellUnder = { i: 0, j: 0 };
+    function updateHealth(dt, t, input) {
+      hurtCool -= dt; slamCool -= dt;
+      for (var id in S.buffs) {
+        if (!S.buffs.hasOwnProperty(id)) continue;
+        S.buffs[id] -= dt;
+        if (S.buffs[id] <= 0) delete S.buffs[id];
+      }
+      if (hud.setBuffs) {
+        var bl = [];
+        for (var bid in S.buffs) {
+          if (!S.buffs.hasOwnProperty(bid)) continue;
+          var src = null;
+          for (var fk in FOODS) if (FOODS[fk].buff && FOODS[fk].buff.id === bid) src = FOODS[fk].buff;
+          bl.push({ id: bid, label: src ? src.label : bid, t: S.buffs[bid] });
+        }
+        hud.setBuffs(bl);
+      }
+
+      // a hard landing
+      if (body.landedThisStep && !body.inWater && body.landImpact > FALL_SAFE) {
+        damage((body.landImpact - FALL_SAFE) * 5, 'fall');
+        hud.toast('Ouch. That was a long way down.', 'bad');
+      }
+
+      if (body.inWater) {
+        if (S.health <= 0) {
+          damage(HP_DROWN * dt, 'drown');
+          if (slamCool <= 0) { hud.toast('No strength left to swim — get OUT.', 'bad'); slamCool = 4; }
+        } else {
+          damage(HP_COLD * dt, 'cold');
+        }
+      } else if (body.grounded && Math.abs(body.pos.y - TILE_TOP) < 0.12) {
+        // standing on the frontier while the waves come over it
+        worldToCell(body.pos.x, body.pos.z, cellUnder);
+        if (sim.get(cellUnder.i, cellUnder.j) && sim.exposure(cellUnder.i, cellUnder.j) > 0) {
+          var over = waves.height(body.pos.x, body.pos.z, t) - (TILE_TOP + 0.12);
+          if (over > 0) {
+            damage(over * 16 * dt, 'sea');
+            if (slamCool <= 0 && over > 0.12) {
+              hud.toast('The waves are breaking over the edge. Step back.', 'bad');
+              fx.burst(body.pos.x, TILE_TOP + 0.3, body.pos.z, 0.8);
+              slamCool = 5;
+            }
+          }
+        }
+      }
+      if (!body.inWater && S.health <= 0) damage(HP_STARVE * dt, 'starve');
+
+      // healing: rested, dry and fed
+      var regen = 0;
+      if (!body.inWater && S.health > 40) regen = HP_REGEN;
+      if (S.buffs.shab3an && !body.inWater) regen = Math.max(regen, 1.4);
+      if (regen && S.hp < HP_MAX) {
+        var hb = S.hp;
+        S.hp = Math.min(HP_MAX, S.hp + regen * dt);
+        if (Math.floor(hb) !== Math.floor(S.hp)) pushStats();
+      }
+      void input;
+    }
+
+    // ---------------------------------------------------------------- menu
+    function menuSummary() {
+      return { metres: sim.count * 4, tiles: sim.count, laid: S.laid, lira: Math.floor(S.lira) };
+    }
+    var hasSave = false;
+    function showMainMenu() {
+      hud.showMenu({ mode: 'main', hasSave: hasSave, summary: hasSave ? menuSummary() : null, settings: SET });
+    }
+    function pause() {
+      if (!S.started || paused) return;
+      paused = true;
+      keys = {}; placing = false; orbiting = false;
+      save();
+      releaseLook();
+      hud.setPrompt(null);
+      hud.showMenu({ mode: 'pause', summary: menuSummary(), settings: SET });
+      updateHint();
+    }
+    function resume() {
+      if (!paused) return;
+      paused = false;
+      hud.hideMenu();
+      clock.getDelta();          // do not bill the pause to the next frame
+      if (firstPerson) requestLook();
+      updateHint();
+    }
+    function quitToMenu() {
+      save();
+      hasSave = true;
+      paused = false;
+      S.started = false;
+      ghost.visible = false;
+      if (hud.setReticle) hud.setReticle('none');
+      hud.setPrompt(null);
+      showMainMenu();
+      updateHint();
+    }
+    function resetGame() {
+      var all = [];
+      sim.forEach(function (tl) { all.push(tl); });
+      for (var n = 0; n < all.length; n++) sim.remove(all[n].i, all[n].j);
+      tiles.clear();
+      S.health = HEALTH_MAX; S.hp = HP_MAX; S.lira = 0; S.knefeEaten = 0;
+      S.laid = 0; S.lost = 0; S.buffs = {}; S.faints = 0; S.fainted = 0;
+      freshStart();
+      body.teleport(0, DECK_Y, -11);
+      cam.yaw = Math.PI; cam.pitch = -0.06;
+      npcs.forEach(function (n2) { n2.talkIdx = 0; n2.greeted = false; });
+      try { localStorage.removeItem(SAVE_KEY); } catch (e) { /* ignore */ }
+      hasSave = false;
+      pushStats();
+    }
+    function onMenu(act, v) {
+      sfx.unlock();
+      if (act === 'continue') { hud.hideMenu(); start(); if (firstPerson) requestLook(); }
+      else if (act === 'new') { resetGame(); hud.hideMenu(); start(); if (firstPerson) requestLook(); }
+      else if (act === 'resume') resume();
+      else if (act === 'pause') pause();
+      else if (act === 'quit') quitToMenu();
+      else if (act === 'setting' && v) {
+        if (v.key === 'sound') setSound(v.value);
+        else if (v.key === 'sens') setSens(0.0022 * v.value, true);
+        else if (v.key === 'fov') {
+          SET.fov = clamp(+v.value, 45, 80); saveSettings();
+          camera.fov = SET.fov; camera.updateProjectionMatrix();
+        } else if (v.key === 'view') setView(v.value === 'first', true);
+        else if (v.key === 'bob') { SET.bob = !!v.value; saveSettings(); }
+      }
+    }
+
     var statsDirty = true;
     function pushStats() { statsDirty = true; }
     function flushStats() {
@@ -1242,7 +1739,7 @@
       hud.setStats({
         mortar: Math.floor(S.mortar), mortarMax: S.mortarMax,
         tiles: sim.count, metres: sim.count * 4, lira: Math.floor(S.lira),
-        health: S.health, healthMax: HEALTH_MAX,
+        health: S.health, healthMax: HEALTH_MAX, hp: S.hp, hpMax: HP_MAX,
         tierIdx: 0, swell: waves.swell(S.elapsed),
         laid: S.laid, lost: S.lost
       });
@@ -1253,6 +1750,7 @@
       return {
         v: 4, sim: sim.serialize(), mortar: S.mortar,
         health: S.health, lira: S.lira, knefeEaten: S.knefeEaten,
+        hp: S.hp, buffs: S.buffs, faints: S.faints,
         elapsed: S.elapsed, laid: S.laid, lost: S.lost,
         px: body.pos.x, py: body.pos.y, pz: body.pos.z
       };
@@ -1268,6 +1766,10 @@
         S.health = typeof d.health === 'number' ? d.health : HEALTH_MAX;
         S.lira = d.lira || 0;
         S.knefeEaten = d.knefeEaten || 0;
+        // older saves predate health: they start whole
+        S.hp = typeof d.hp === 'number' && d.hp > 0 ? clamp(d.hp, 1, HP_MAX) : HP_MAX;
+        S.buffs = (d.buffs && typeof d.buffs === 'object') ? d.buffs : {};
+        S.faints = d.faints || 0;
         S.elapsed = d.elapsed || 0; S.laid = d.laid || 0; S.lost = d.lost || 0;
         tiles.clear();
         sim.forEach(function (t) { tiles.add(t.i, t.j, t.tier); });
@@ -1289,19 +1791,27 @@
 
     var restored = applySave(saved);
     if (!restored) freshStart();
+    hasSave = restored && (S.laid > 0 || sim.count > 5 || S.lira > 0);
     pushStats();
-    hud.showIntro();
+    setView(firstPerson, true);
+    showMainMenu();
 
+    var startedOnce = false;
     function start() {
       if (S.started) return;
       S.started = true;
+      paused = false;
       sfx.unlock();
       hud.hideIntro();
-      hud.toast(IS_TOUCH
-        ? 'Drag to look. Hold SHOVEL at a pile, then tap بلّط.'
-        : 'Click to capture the mouse. Hold E at a pile for mouna.', 'info');
+      clock.getDelta();
+      if (!startedOnce) {
+        startedOnce = true;
+        hud.toast(IS_TOUCH
+          ? 'Drag to look. Hold SHOVEL at a pile, then tap بلّط.'
+          : 'Click to capture the mouse. Hold E at a pile for mouna. Esc pauses.', 'info');
+        setTimeout(heckle, 6500);
+      }
       updateHint();
-      setTimeout(heckle, 6500);
     }
 
     // ------------------------------------------------------------ the loop
@@ -1318,12 +1828,20 @@
       requestAnimationFrame(frame);
       var dt = Math.min(clock.getDelta(), 0.05);
       if (!dt) return;
+      if (paused) {
+        // the world holds still behind the pause menu; only the HUD animates
+        hud.frame(dt);
+        renderer.render(scene, camera);
+        return;
+      }
       tick(dt);
     }
 
     function tick(dt) {
       S.elapsed += dt;
       var t = S.elapsed;
+
+      edgeTurn(dt);
 
       // --- camera keys
       if (keys.ArrowLeft) cam.yaw += dt * 1.7;
@@ -1347,13 +1865,24 @@
 
       // under a quarter health you slow down; empty, you can barely walk
       var legs = S.health <= 0 ? 0.45 : (S.health < 25 ? 0.7 : 1);
+      if (S.hp < 25) legs *= 0.8;           // hurt, you limp
+      var canMove = S.started && !S.fainted;
       var input = {
-        moveX: S.started ? moveVec.x * legs : 0,
-        moveZ: S.started ? moveVec.z * legs : 0,
-        jump: !!keys.Space && S.health > 0,
-        run: !!(keys.ShiftLeft || keys.ShiftRight) && S.health > 25
+        moveX: canMove ? moveVec.x * legs : 0,
+        moveZ: canMove ? moveVec.z * legs : 0,
+        jump: canMove && !!keys.Space && S.health > 0,
+        run: canMove && !!(keys.ShiftLeft || keys.ShiftRight) && S.health > 25
       };
       body.step(dt, t, input, waves);
+      if (S.started) {
+        if (S.fainted) {
+          S.fainted -= dt;
+          if (S.fainted <= 0) wakeUp();
+        } else {
+          updateHealth(dt, t, input);
+        }
+      }
+      updateBoards(dt);
 
       // --- simulation
       var destroyed = sim.update(dt, t);
@@ -1378,8 +1907,8 @@
         sim.forEach(function (tile) { if (tile.hp < tile.maxHp) tiles.wear(tile); });
       }
 
-      if (placing) tryPlace(false);
-      if (S.started) updateGathering(dt);
+      if (placing && !S.fainted) tryPlace(false);
+      if (S.started && !S.fainted) updateGathering(dt);
       updateNPCs(dt);
       updateSky();
 
@@ -1428,11 +1957,12 @@
       S.wasInWater = body.inWater;
 
       // stamina drains by what you are actually doing
-      if (S.started) {
+      if (S.started && !S.fainted) {
         var drain = DRAIN_IDLE;
         if (body.inWater) drain = DRAIN_WATER;
         else if (digging) drain = DRAIN_DIG;
         else if (input.run && spd > 0.5) drain = DRAIN_RUN;
+        if (S.buffs.barid) drain *= 0.5;      // a jallab in you
         var before = S.health;
         S.health = clamp(S.health - drain * dt, 0, HEALTH_MAX);
         if (Math.floor(before) !== Math.floor(S.health)) pushStats();
@@ -1447,9 +1977,20 @@
       }
 
       // --- camera
-      if (firstPerson) {
+      if (!S.started) {
+        /* Behind the main menu: a slow drift along the corniche and out over
+           the tiles, the castle and the mole swinging through the right side
+           of the screen while the menu holds the left. */
+        var ca = t * 0.028;
+        viewModel.visible = false;
+        camera.position.set(-18 + Math.sin(ca) * 30, 9 + Math.sin(ca * 0.7) * 2.5, 30 + Math.cos(ca) * 16);
+        camera.rotation.set(0, 0, 0);
+        camTarget.set(-28 + Math.sin(ca * 0.6) * 22, 2.5, -6);
+        camera.lookAt(camTarget);
+      } else if (firstPerson) {
+        viewModel.visible = !S.fainted;
         // head bob keyed to actual ground speed, killed while swimming
-        var bobAmt = clamp(spd / 6, 0, 1) * (body.inWater ? 0 : 1);
+        var bobAmt = clamp(spd / 6, 0, 1) * (body.inWater ? 0 : 1) * (SET.bob === false ? 0 : 1);
         bobT += dt * (5.5 + spd * 1.5);
         bobY = lerp(bobY, Math.sin(bobT) * 0.045 * bobAmt, clamp(dt * 12, 0, 1));
         bobRoll = lerp(bobRoll, Math.cos(bobT * 0.5) * 0.013 * bobAmt, clamp(dt * 10, 0, 1));
@@ -1480,7 +2021,7 @@
       }
 
       // --- ghost balata under the cursor
-      if (S.started) {
+      if (S.started && !S.fainted) {
         raycaster.setFromCamera(aimNDC(), camera);
         if (raycaster.ray.intersectPlane(groundPlane, hitPoint)) {
           worldToCell(hitPoint.x, hitPoint.z, cellTmp);
@@ -1494,6 +2035,9 @@
             ghostMat.opacity = bad ? 0.22 : 0.30 + Math.sin(t * 6) * 0.06;
           }
         } else { ghost.visible = false; if (hud.setReticle) hud.setReticle('none'); }
+      } else if (ghost.visible) {
+        ghost.visible = false;
+        if (hud.setReticle) hud.setReticle('none');
       }
 
       sea.update(t, body.pos.x, body.pos.z);
@@ -1535,7 +2079,9 @@
       state: S, sim: sim, save: save, serialize: serialize,
       body: body, world: world, camera: camera, npcs: npcs, tiles: tiles,
       waves: waves, cam: cam, hud: hud, renderer: renderer, scene: scene,
-      tick: tick, npcSay: npcSay, npcEvent: npcEvent, sfx: sfx
+      tick: tick, npcSay: npcSay, npcEvent: npcEvent, sfx: sfx,
+      damage: damage, pause: pause, resume: resume, onMenu: onMenu, boards: boards,
+      settings: SET, foods: FOODS, adSource: function () { return adSource; }
     };
   }
 

@@ -9,7 +9,7 @@ cd "$(dirname "$0")"
 mkdir -p dist
 python3 - <<'PY'
 import io, os
-order = ['physics.js', 'world.js', 'hud.js', 'game.js']
+order = ['ads.js', 'physics.js', 'world.js', 'hud.js', 'game.js']
 missing = [f for f in order if not os.path.exists(f)]
 if missing:
     raise SystemExit('missing module(s): ' + ', '.join(missing))
@@ -75,6 +75,11 @@ if os.path.exists(THREE_SRC):
         if os.path.exists(src):
             io.open(os.path.join('docs', name), 'w', encoding='utf-8').write(
                 io.open(src, encoding='utf-8').read())
+    # the billboard CMS and the ad list it publishes ride along with the game
+    for name in ('cms.html', 'ads.js', 'ads.json'):
+        if os.path.exists(name):
+            io.open(os.path.join('docs', name), 'w', encoding='utf-8').write(
+                io.open(name, encoding='utf-8').read())
     print('standalone/index.html + docs/index.html %.1f KB'
           ' (three.js inlined; fonts still from Google)' % (len(page) / 1024.0))
 else:

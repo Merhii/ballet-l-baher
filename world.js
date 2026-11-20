@@ -1538,6 +1538,203 @@
     return { group: g, at: { x: KX, y: FLOOR, z: KZ + 3.0 } };
   }
 
+  /* =========================================================================
+     FOOD COURTS — two clusters of stalls with plastic tables in front:
+     Souk el Akel (east, the street-food row) and Sahet el Qal3a (west, the
+     square looking at the castle). Each stall has a readable sign, a counter
+     the vendor stands behind, and one food the game sells there. Strings of
+     bulbs come on at night. One merged mesh per material per court.
+     ========================================================================= */
+  const FOOD_COURTS = [
+    {
+      id: 'souk', name: 'Souk el Akel', ar: 'سوق الأكل', sub: 'FOOD COURT · EAST',
+      cx: 42, cz: -26,
+      stalls: [
+        { id: 'manoushe', ar: 'فرن أبو فادي', sub: 'MANAKISH · ZA3TAR', prop: 'furn',
+          bg: '#3F6B3A', fg: '#EDF6F3', awn: ['PALM_GREEN', 'FOAM'] },
+        { id: 'shawarma', ar: 'شاورما زيري', sub: 'SHAWARMA · DJEJ W LA7MA', prop: 'spit',
+          bg: '#8C4A2F', fg: '#F6C445', awn: ['RUST', 'SUN'] },
+        { id: 'falafel', ar: 'فلافل المينا', sub: 'FALAFEL · SINCE FOREVER', prop: 'fryer',
+          bg: '#F2B733', fg: '#0B3A4F', awn: ['HAZARD', 'SEA_DEEP'] }
+      ]
+    },
+    {
+      id: 'qalaa', name: 'Sahet el Qal3a', ar: 'ساحة القلعة', sub: 'FOOD COURT · WEST',
+      cx: -62, cz: -26,
+      stalls: [
+        { id: 'samke', ar: 'صيّادية البحر', sub: 'SAMAK · SAYYADIYEH', prop: 'fish',
+          bg: '#16708C', fg: '#EDF6F3', awn: ['SEA_MID', 'FOAM'] },
+        { id: 'jallab', ar: 'جلّاب وعصير', sub: 'JALLAB · 3ASIR · TALJ', prop: 'jugs',
+          bg: '#0A1A33', fg: '#F2B733', awn: ['NIGHT_TOP', 'SUN'] },
+        { id: 'kaake', ar: 'كعكة صيدا', sub: 'KA3KE · BA2DOUNES', prop: 'kaake',
+          bg: '#E4D7B3', fg: '#B9502F', awn: ['TERRACOTTA', 'LIMESTONE'] }
+      ]
+    }
+  ];
+
+  function signPlane(o, w, h, x, y, z, ry, parent) {
+    const mat = new T.MeshBasicMaterial({ map: texShopSign(o), side: T.DoubleSide });
+    W.mats.push(mat);
+    const geo = new T.PlaneGeometry(w, h);
+    W.geos.push(geo);
+    const mesh = new T.Mesh(geo, mat);
+    mesh.position.set(x, y, z);
+    mesh.rotation.y = ry || 0;
+    mesh.name = 'sign';
+    parent.add(mesh);
+    return mesh;
+  }
+
+  function buildFoodCourts() {
+    const C0 = W.COL, c = new T.Color(), FLOOR = 1.5;
+    const out = [];
+    for (let ci = 0; ci < FOOD_COURTS.length; ci++) {
+      const fc = FOOD_COURTS[ci], rng = mulberry(8800 + ci * 31);
+      const m = new Mesher(), mf = new Mesher(), mg = new Mesher();
+      const g = new T.Group();
+      g.name = 'foodcourt-' + fc.id;
+      const SZ = fc.cz - 1;                       // stall centre line
+      const court = { id: fc.id, name: fc.name, ar: fc.ar, x: fc.cx, y: FLOOR, z: fc.cz + 6, stalls: [] };
+
+      // a poured slab under the whole court, so it reads as one place
+      m.box(vary(mixc(C0.LIMESTONE, C0.CEMENT, 0.4, c), rng, 0.04, c),
+        fc.cx, FLOOR + 0.02, fc.cz + 3.5, 24, 0.06, 17, 0, 0, 0, 1 / 6);
+
+      for (let si = 0; si < fc.stalls.length; si++) {
+        const st = fc.stalls[si], SX = fc.cx + (si - 1) * 7.2;
+        // plinth + three walls, open to the sea
+        m.box(vary(C0.CEMENT, rng, 0.07, c), SX, FLOOR + 0.08, SZ, 5.8, 0.16, 4.0, 0, 0, 0, 1 / 6);
+        const wall = mixc(C0.LIMESTONE, C(st.bg), 0.22, new T.Color());
+        for (let y = FLOOR + 0.15; y < FLOOR + 3.2; y += 0.5) {
+          const h = Math.min(0.5, FLOOR + 3.2 - y);
+          const parts = [[0, -1.8, 5.4, 0.36], [-2.55, 0, 0.36, 3.6], [2.55, 0, 0.36, 3.6]];
+          for (let k = 0; k < 3; k++) {
+            const b = parts[k];
+            vary(y < FLOOR + 0.9 ? mixc(C0.CEMENT, C0.STONE_DARK, 0.4, c) : wall, rng, 0.07, c);
+            m.box(c, SX + b[0], y + h * 0.5, SZ + b[1], b[2], h * 1.02, b[3], 0, 0, 0, 1 / 5);
+          }
+        }
+        // flat roof slab, a little proud of the walls
+        m.box(vary(C0.CEMENT, rng, 0.05, c), SX, FLOOR + 3.28, SZ - 0.1, 5.9, 0.18, 4.1, 0, 0, 0, 1 / 5);
+        // counter
+        m.box(vary(C0.LIMESTONE, rng, 0.05, c), SX, FLOOR + 1.02, SZ + 1.55, 5.2, 0.16, 0.85, 0, 0, 0, 1 / 5);
+        m.box(mixc(C0.CEMENT, C0.STONE_DARK, 0.3, c), SX, FLOOR + 0.5, SZ + 1.6, 5.0, 0.9, 0.6, 0, 0, 0, 1 / 6);
+        // striped awning
+        const a0 = C0[st.awn[0]], a1 = C0[st.awn[1]];
+        for (let i = 0; i < 8; i++) {
+          mf.box((i % 2 ? a1 : a0).clone(), SX - 2.45 + i * 0.7, FLOOR + 2.86, SZ + 2.2, 0.7, 0.09, 1.3, -0.24, 0, 0);
+        }
+        // the food, on and behind the counter
+        const top = FLOOR + 1.1, cz = SZ + 1.5;
+        if (st.prop === 'furn') {
+          m.prim(PRIM.dome, mixc(C0.TERRACOTTA, C0.STONE_DARK, 0.3, c), SX - 1.2, FLOOR + 0.2, SZ - 0.6, 2.4, 2.6, 2.4);
+          mf.prim(PRIM.disc || PRIM.cyl12, C0.NIGHT_TOP, SX - 1.2, FLOOR + 0.9, SZ + 0.55, 0.9, 0.6, 0.1, Math.PI / 2, 0, 0);
+          for (let k = 0; k < 5; k++) {
+            mf.prim(PRIM.cyl12, mixc(C0.PALM_GREEN, C0.LIMESTONE, 0.45, c), SX + 0.2 + (k % 3) * 0.75, top + 0.03 + ((k / 3) | 0) * 0.05, cz + ((k / 3) | 0) * 0.15, 0.62, 0.04, 0.62);
+          }
+        } else if (st.prop === 'spit') {
+          for (let k = 0; k < 2; k++) {
+            const px = SX - 1.4 + k * 1.2;
+            mf.prim(PRIM.cyl6, C0.CEMENT, px, top + 0.75, SZ + 0.9, 0.06, 1.6, 0.06);
+            mf.prim(PRIM.cone8, mixc(C0.RUST, C0.SUN, 0.25 + k * 0.2, c), px, top + 0.7, SZ + 0.9, 0.62, 1.1, 0.62, Math.PI, 0, 0);
+          }
+          mf.box(mixc(C0.CEMENT, C0.NIGHT_TOP, 0.3, c), SX - 0.8, top + 0.7, SZ + 0.35, 2.3, 1.4, 0.12);
+          for (let k = 0; k < 6; k++) {
+            mf.prim(PRIM.cyl8, mixc(C0.LIMESTONE, C0.FOAM, 0.4, c), SX + 0.9 + (k % 3) * 0.3, top + 0.06, cz - 0.1 + ((k / 3) | 0) * 0.25, 0.12, 0.12, 0.6, 0, 0.3, Math.PI / 2);
+          }
+        } else if (st.prop === 'fryer') {
+          mf.prim(PRIM.cyl12, mixc(C0.CEMENT, C0.NIGHT_TOP, 0.55, c), SX - 1.2, top + 0.22, cz - 0.1, 1.1, 0.42, 1.1);
+          mf.prim(PRIM.cyl12, mixc(C0.SUN, C0.RUST, 0.4, c), SX - 1.2, top + 0.42, cz - 0.1, 0.92, 0.04, 0.92);
+          for (let k = 0; k < 14; k++) {
+            mf.prim(PRIM.sph, mixc(C0.RUST, C0.TRUNK, 0.5 + rng() * 0.3, c), SX + 0.6 + (rng() - 0.5) * 1.1, top + 0.08 + (k > 9 ? 0.1 : 0), cz + (rng() - 0.5) * 0.4, 0.18);
+          }
+        } else if (st.prop === 'fish') {
+          m.box(mixc(C0.FOAM, C0.SEA_SHALLOW, 0.3, c), SX, top + 0.08, cz, 4.2, 0.16, 0.7);
+          for (let k = 0; k < 7; k++) {
+            mf.prim(PRIM.sph, mixc(C0.CEMENT, C0.SEA_MID, 0.3 + rng() * 0.3, c), SX - 1.8 + k * 0.6, top + 0.2, cz + (rng() - 0.5) * 0.25, 0.5, 0.14, 0.18, 0, 0.3 * (rng() - 0.5), 0);
+          }
+        } else if (st.prop === 'jugs') {
+          for (let k = 0; k < 3; k++) {
+            mf.prim(PRIM.cyl12, mixc(C0.RUST, C0.NIGHT_TOP, 0.35 + k * 0.12, c), SX - 1.6 + k * 0.8, top + 0.4, cz, 0.5, 0.8, 0.5);
+            mf.prim(PRIM.cyl8, C0.CEMENT, SX - 1.6 + k * 0.8, top + 0.84, cz, 0.3, 0.08, 0.3);
+          }
+          m.box(mixc(C0.FOAM, C0.SKY_HAZE, 0.5, c), SX + 1.3, top + 0.18, cz, 1.3, 0.36, 0.6);
+        } else if (st.prop === 'kaake') {
+          mf.prim(PRIM.cyl6, C0.TRUNK, SX + 1.6, top + 0.8, cz - 0.2, 0.08, 1.6, 0.08);
+          for (let k = 0; k < 6; k++) {
+            mf.prim(PRIM.torus, mixc(C0.SUN, C0.TRUNK, 0.35, c), SX + 1.6 + (k % 2 ? 0.22 : -0.22), top + 0.5 + k * 0.2, cz - 0.2, 0.75, 0.75, 0.75, 0, k * 0.8, Math.PI / 2);
+          }
+          for (let k = 0; k < 4; k++) {
+            mf.prim(PRIM.torus, mixc(C0.SUN, C0.TRUNK, 0.3, c), SX - 1.4 + k * 0.6, top + 0.05, cz, 0.7, 0.7, 0.7, Math.PI / 2, 0, 0);
+          }
+        }
+        signPlane({ w: 1024, h: 256, ar: st.ar, sub: st.sub, bg: st.bg, fg: st.fg,
+          border: 'rgba(237,246,243,0.6)' }, 5.0, 1.25, SX, FLOOR + 2.25, SZ + 2.05, 0, g);
+        coll(SX - 2.9, SZ - 2.0, SX + 2.9, SZ + 2.0, FLOOR + 3.37);
+        court.stalls.push({ id: st.id, ar: st.ar, x: SX, y: FLOOR, z: SZ + 2.9 });
+      }
+
+      // tables and chairs in front, a parasol on every other table
+      const PLASTIC = [C0.FOAM, C0.SEA_SHALLOW, C0.TERRACOTTA, C0.HAZARD];
+      for (let row = 0; row < 2; row++) {
+        for (let col = 0; col < 3; col++) {
+          const tx = fc.cx + (col - 1) * 6.4 + (rng() - 0.5) * 0.8;
+          const tz = fc.cz + 5.2 + row * 4.4 + (rng() - 0.5) * 0.6;
+          const pc = PLASTIC[(row * 3 + col + ci) % 4];
+          mf.prim(PRIM.cyl12, shade(pc, 0.05, c), tx, FLOOR + 0.78, tz, 1.4, 0.06, 1.4);
+          mf.prim(PRIM.cyl6, shade(pc, -0.1, c), tx, FLOOR + 0.4, tz, 0.12, 0.76, 0.12);
+          for (let k = 0; k < 4; k++) {
+            const a = k * Math.PI / 2 + rng() * 0.4;
+            chairMesher(mf, pc, tx + Math.sin(a) * 1.05, FLOOR, tz + Math.cos(a) * 1.05, a + Math.PI, 0);
+          }
+          if ((row + col) % 2 === 0) {
+            mf.prim(PRIM.cyl6, C0.CEMENT, tx, FLOOR + 1.6, tz, 0.07, 1.7, 0.07);
+            mf.prim(PRIM.cone8, (row ? C0.TERRACOTTA : C0.SEA_SHALLOW).clone(), tx, FLOOR + 2.55, tz, 3.0, 0.55, 3.0);
+          }
+          coll(tx - 0.75, tz - 0.75, tx + 0.75, tz + 0.75, FLOOR + 0.82);
+        }
+      }
+
+      // the gateway, with the court's name, and bulbs strung back to the stalls
+      const gz = fc.cz + 11.6;
+      for (let s = -1; s <= 1; s += 2) {
+        m.prim(PRIM.cyl8, vary(C0.CEMENT, rng, 0.06, c), fc.cx + s * 5.2, FLOOR + 2.2, gz, 0.26, 4.4, 0.26);
+        coll(fc.cx + s * 5.2 - 0.2, gz - 0.2, fc.cx + s * 5.2 + 0.2, gz + 0.2, FLOOR + 4.4);
+      }
+      m.box(vary(C0.CEMENT, rng, 0.05, c), fc.cx, FLOOR + 4.3, gz, 10.8, 0.16, 0.2);
+      signPlane({ w: 1024, h: 256, ar: fc.ar, sub: fc.sub, bg: '#0B3A4F', fg: '#F2B733',
+        border: 'rgba(242,183,51,0.75)' }, 7.0, 1.6, fc.cx, FLOOR + 3.4, gz + 0.05, 0, g);
+      for (let s = 0; s < 4; s++) {
+        const x0 = fc.cx + (s - 1.5) * 3.4, z0 = gz, x1 = fc.cx + (s - 1.5) * 4.4, z1 = SZ + 2.6;
+        for (let k = 1; k < 10; k++) {
+          const t = k / 10, sag = Math.sin(t * Math.PI) * 0.7;
+          mg.prim(PRIM.sph, C0.SUN, lerp(x0, x1, t), FLOOR + 4.25 - (4.25 - 3.0) * t - sag, lerp(z0, z1, t), 0.16);
+        }
+      }
+
+      g.add(bake(m, W.MAT.plaster, 'foodcourtShell-' + fc.id));
+      g.add(bake(mf, W.MAT.flat, 'foodcourtFittings-' + fc.id));
+      const glow = bake(mg, W.MAT.glowOff, 'foodcourtBulbs-' + fc.id);
+      if (glow) { W.group.remove(glow); g.add(glow); W.night.push(glow); }
+      out.push({ group: g, court: court });
+    }
+    return out;
+  }
+
+  /* Billboard sites. The game hangs the boards and paints the ads (from the
+     CMS); the world only says where they stand. `y` is the board's bottom
+     edge, `ry` its facing (0 = toward open sea), w×h its face in metres. */
+  function adSlotList() {
+    return [
+      // `base` is what the legs stand on: deck, a stall roof, the mole's top
+      { id: 'corniche-w', placement: 'corniche', x: -16, base: 1.5, y: 5.0, z: -32.2, ry: 0, w: 9, h: 4.5 },
+      { id: 'corniche-e', placement: 'corniche', x: 31, base: 1.5, y: 5.0, z: -32.6, ry: 0, w: 9, h: 4.5 },
+      { id: 'souk', placement: 'souk', x: FOOD_COURTS[0].cx, base: 4.87, y: 5.6, z: FOOD_COURTS[0].cz - 2.6, ry: 0, w: 8, h: 4 },
+      { id: 'qalaa', placement: 'qalaa', x: FOOD_COURTS[1].cx, base: 4.87, y: 5.6, z: FOOD_COURTS[1].cz - 2.6, ry: 0, w: 8, h: 4 },
+      { id: 'harbour', placement: 'harbour', x: -50, base: 2.3, y: 3.2, z: 51, ry: 2.12, w: 12, h: 6 }
+    ];
+  }
+
   function buildKioskAndCart() {
     const C0 = W.COL, rng = mulberry(7700), c = new T.Color();
     const m = new Mesher(), mg = new Mesher();
@@ -2436,6 +2633,8 @@
     const kiosk = buildKioskAndCart();
     const knefe = buildKnefe();
     group.add(knefe.group);
+    const courts = buildFoodCourts();
+    for (let i = 0; i < courts.length; i++) group.add(courts[i].group);
     buildClutter();
     const sandPiles = buildSandPiles();
     buildFisherman();
@@ -2677,6 +2876,8 @@
       timeOfDay: 0, isNight: false,
       materials: W.MAT,
       cart: W.cart,                               // the manakish/coffee cart
+      foodCourts: courts.map(function (c) { return c.court; }),   // stalls the game sells from
+      adSlots: adSlotList(),                      // where the billboards stand
       stairs: STAIR.map(function (s) { return { top: s.top, z1: s.z1, z2: s.z2, x1: -5, x2: 5 }; }),
       setLightsEnabled: function (on) { lights.visible = !!on; }
     };
