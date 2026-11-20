@@ -7827,15 +7827,25 @@
     }
 
     // where the (uncaptured) mouse is, for free look's edge turning
-    var ptr = { x: 0, y: 0, inside: false };
+    var ptr = { x: 0, y: 0, inside: false, onCanvas: false };
     document.addEventListener('mouseleave', function () { ptr.inside = false; });
-    window.addEventListener('blur', function () { ptr.inside = false; });
+    /* Leaving the game (alt-tab, another window, a hidden tab) pauses it, so
+       the sea does not work on the player's tiles while they are away. With
+       the mouse captured this already happens through the lock; without it,
+       nothing else would notice. */
+    window.addEventListener('blur', function () {
+      ptr.inside = false;
+      if (S.started && !paused && !S.fainted) pause();
+    });
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden && S.started && !paused && !S.fainted) pause();
+    });
     function freeLookOn() {
       return !IS_TOUCH && firstPerson && !fp.locked && S.started && !paused && !S.fainted &&
         !(hud.isMenuOpen && hud.isMenuOpen());
     }
     function edgeTurn(dt) {
-      if (!freeLookOn() || !ptr.inside) return;
+      if (!freeLookOn() || !ptr.inside || !ptr.onCanvas) return;
       // sideways only: pitch has a short range the mouse covers anyway, and the
       // top edge is where the HUD's buttons live
       var W = window.innerWidth, edge = Math.max(36, W * 0.05);
@@ -8006,6 +8016,8 @@
         return;
       }
       ptr.x = e.clientX; ptr.y = e.clientY; ptr.inside = true;
+      // over a HUD button (menu, sound) the edge must not turn the view
+      ptr.onCanvas = e.target === canvas;
       if (freeLookOn() && e.pointerType === 'mouse' && !orbiting) {
         /* Free look without the capture: the view follows the mouse, no button
            held. Holding the pointer against an edge keeps turning (see tick). */
@@ -8179,8 +8191,11 @@
       var board = (!who && !pile) ? boardInView() : null;
       // whoever is closer wins the E key
       if (tTalk) {
-        tTalk.style.display = (who || board) ? 'block' : 'none';
-        tTalk.textContent = board ? 'OPEN AD' : 'TALK';
+        var tShow = (who || board) ? 'block' : 'none';
+        var tText = board ? 'OPEN AD' : (who && who.npc.def.sells ? 'BUY' : 'TALK');
+        // written only when they change: this runs every frame on a phone
+        if (tTalk.style.display !== tShow) tTalk.style.display = tShow;
+        if (tTalk.textContent !== tText) tTalk.textContent = tText;
       }
       if (board) {
         var bl = board.ad ? 'open the billboard · ' + board.ad.sponsor : 'this billboard is for rent';
@@ -8511,8 +8526,10 @@
         eat(food);
         kind = 'sold';
         hud.toast(foodToast(food, true), 'good');
-      } else if (npc.def.sells === 'knefe' && (S.health <= 25 || S.hp <= 25)) {
-        // he is not going to watch you fold over 25 lira
+      } else if (npc.def.sells === 'knefe' && (S.health <= 25 || S.hp <= 25) &&
+                 S.elapsed - (S.lastFreeKnefe || -1e9) > 90) {
+        // he is not going to watch you fold over 25 lira — once in a while
+        S.lastFreeKnefe = S.elapsed;
         eat(food);
         kind = 'broke';
         hud.toast('3a 7sabe — ' + foodToast(food, false), 'good');
@@ -9141,8 +9158,9 @@
       }
       updateBoards(dt);
 
-      // --- simulation
-      var destroyed = sim.update(dt, t);
+      // --- simulation. Only while playing: behind the main menu the sea would
+      // otherwise eat the player's tiles with nobody there and no rent paid.
+      var destroyed = S.started ? sim.update(dt, t) : null;
       if (destroyed && destroyed.length) {
         for (var n = 0; n < destroyed.length; n++) {
           var d = destroyed[n];
