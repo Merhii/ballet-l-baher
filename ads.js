@@ -18,7 +18,7 @@
   /* Billboard locations in the world. An ad lists the ones it is booked on. */
   var PLACEMENTS = ['corniche-w', 'corniche-e', 'souk', 'qalaa', 'harbour'];
   var PLACEMENT_NAMES = {
-    'corniche-w': 'Corniche west hoarding (by the stairs)',
+    'corniche-w': 'Corniche hoarding facing the stairs',
     'corniche-e': 'Corniche east hoarding (behind the kiosk)',
     souk: 'Souk el Akel roof (east food court)',
     qalaa: 'Sahet el Qal3a roof (west food court)',

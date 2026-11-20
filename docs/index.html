@@ -72,7 +72,7 @@
   /* Billboard locations in the world. An ad lists the ones it is booked on. */
   var PLACEMENTS = ['corniche-w', 'corniche-e', 'souk', 'qalaa', 'harbour'];
   var PLACEMENT_NAMES = {
-    'corniche-w': 'Corniche west hoarding (by the stairs)',
+    'corniche-w': 'Corniche hoarding facing the stairs',
     'corniche-e': 'Corniche east hoarding (behind the kiosk)',
     souk: 'Souk el Akel roof (east food court)',
     qalaa: 'Sahet el Qal3a roof (west food court)',
@@ -3700,8 +3700,10 @@
          The corniche hoardings stand well clear of z = -32, where the city's
          ground slab starts at board height and would swallow them. The roof
          boards sit high enough to clear the parasols and the gateway sign. */
-      { id: 'corniche-w', placement: 'corniche-w', x: -15, base: 1.5, y: 4.2, z: -26.5, ry: 0, w: 9, h: 4.5 },
-      { id: 'corniche-e', placement: 'corniche-e', x: 7, base: 1.5, y: 4.2, z: -26.5, ry: 0, w: 9, h: 4.5 },
+      // corniche-w faces the top of the stairs, with no mouna pile in front of
+      // it (a pile within reach would take the E key from the board)
+      { id: 'corniche-w', placement: 'corniche-w', x: -4, base: 1.5, y: 4.2, z: -26.5, ry: 0, w: 9, h: 4.5 },
+      { id: 'corniche-e', placement: 'corniche-e', x: 9.5, base: 1.5, y: 4.2, z: -26.5, ry: 0, w: 9, h: 4.5 },
       { id: 'souk', placement: 'souk', x: FOOD_COURTS[0].cx, base: 4.87, y: 7.2, z: FOOD_COURTS[0].cz - 2.6, ry: 0, w: 9, h: 4.5 },
       { id: 'qalaa', placement: 'qalaa', x: FOOD_COURTS[1].cx, base: 4.87, y: 7.2, z: FOOD_COURTS[1].cz - 2.6, ry: 0, w: 9, h: 4.5 },
       // on a concrete plinth of its own, so it plainly stands on the mole
