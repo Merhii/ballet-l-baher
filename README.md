@@ -41,7 +41,9 @@ Five billboards stand in the world: two hoardings behind the promenade, one on
 each food-court roof, and one on a plinth out on the harbour mole. They rotate
 through the ads in `ads.json` (text and colour, painted on a canvas at runtime —
 still no asset files). A board with nothing booked advertises itself: "ad space
-coming soon, inquire in Credits".
+coming soon, inquire in Credits". Standing in front of a board and pressing `E`
+brings the ad up close, with a button to the sponsor's site (or, on an empty
+board, to email about booking it); the game pauses behind it.
 
 `cms.html` edits them: sponsor, Arabic name, headline, layout, colours, which
 board each ad runs on, weight, start and end dates. It is **not** published with
@@ -63,6 +65,7 @@ browser only — there is no server.
 | click / hold click | lay a balata / sweep a row |
 | hold `E` at a pile | shovel mouna |
 | `E` beside someone | talk to them, or buy food at a counter |
+| `E` facing a billboard | open the ad (with a link to the sponsor) |
 | `Esc` / `P` | pause menu |
 | `V` | first / third person |
 | `M` | sound |

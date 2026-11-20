@@ -607,6 +607,21 @@
 '.blb-faint .bill{margin:6px auto 0;padding:8px 14px;border:2px dashed rgba(237,246,243,.5);',
 '  font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-variant-numeric:tabular-nums;}',
 '@keyframes blb-fade{from{opacity:0}to{opacity:1}}',
+/* --- the ad card: a billboard brought up close when you press E at it --- */
+'.blb-adcard{position:absolute;inset:0;display:none;align-items:center;justify-content:center;',
+'  padding:18px;pointer-events:auto;background:rgba(10,26,51,.72);}',
+'.blb-adcard.on{display:flex;animation:blb-fade .25s ease-out both;}',
+'.blb-adbox{width:min(720px,100%);max-height:100%;overflow-y:auto;}',
+'.blb-adbox .cap{height:9px;}',
+'.blb-adbox img{display:block;width:100%;height:auto;aspect-ratio:2/1;border-bottom:2px solid var(--blb-ink);}',
+'.blb-adbody{padding:12px 16px 16px;display:grid;gap:10px;}',
+'.blb-adbody .who{font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;opacity:.65;}',
+'.blb-adbody .hd{font-size:clamp(18px,3.4vw,24px);font-weight:700;line-height:1.15;}',
+'.blb-adbody .tg{font-size:14px;opacity:.75;}',
+'.blb-adbody .row{display:flex;flex-wrap:wrap;gap:10px;margin-top:4px;}',
+'.blb-adbody .blb-mbtn{grid-template-columns:1fr auto;flex:1 1 220px;}',
+'.blb-adbody a.blb-mbtn{text-decoration:none;color:var(--blb-ink);}',
+'.blb-adbody .note{font-size:11px;letter-spacing:.06em;opacity:.55;}',
 '.blb-menubtn{pointer-events:auto;width:34px;height:30px;display:grid;place-items:center;}',
 '.blb-menubtn:hover{background-color:var(--blb-haz);}',
 '.blb-menubtn i{display:block;width:14px;height:2.5px;background:var(--blb-ink);box-shadow:0 5px 0 var(--blb-ink),0 -5px 0 var(--blb-ink);}',
@@ -953,6 +968,60 @@
       faint.classList.add('on');
     }
     function hideFaint() { faint.classList.remove('on'); }
+
+    /* Pressing E at a billboard brings the ad up close: the board itself,
+       the sponsor, and a link out. Nothing opens elsewhere unless the
+       player clicks — the game stays paused behind the card. */
+    const adCard = el('div', 'blb-adcard');
+    adCard.setAttribute('role', 'dialog');
+    adCard.setAttribute('aria-modal', 'true');
+    adCard.setAttribute('aria-label', 'Billboard');
+    adCard.innerHTML = '<div class="blb-plaque blb-adbox"><div class="cap blb-haz"></div>' +
+      '<img alt="" data-adimg><div class="blb-adbody">' +
+      '<div class="who" data-adwho></div><div class="hd" data-adhd></div><div class="tg" data-adtg></div>' +
+      '<div class="row"><a class="blb-mbtn primary" data-adgo target="_blank" rel="noopener noreferrer">' +
+        '<span class="l" data-adcta></span><span class="a">↗</span></a>' +
+      '<button class="blb-mbtn" type="button" data-adclose><span class="l">Back to the sea' +
+        '<span class="s">Esc / E</span></span><span class="a">رجوع</span></button></div>' +
+      '<div class="note" data-adnote></div></div></div>';
+    const adEls = {
+      img: adCard.querySelector('[data-adimg]'), who: adCard.querySelector('[data-adwho]'),
+      hd: adCard.querySelector('[data-adhd]'), tg: adCard.querySelector('[data-adtg]'),
+      go: adCard.querySelector('[data-adgo]'), cta: adCard.querySelector('[data-adcta]'),
+      note: adCard.querySelector('[data-adnote]'), close: adCard.querySelector('[data-adclose]')
+    };
+    let adOpen = false, adOnClose = null, adOnVisit = null;
+    function showAdCard(o) {
+      o = o || {};
+      adEls.img.src = o.image || '';
+      adEls.img.alt = (o.sponsor || 'Billboard') + ' billboard';
+      adEls.who.textContent = o.vacant ? 'Billboard for rent' : 'Sponsor · ' + (o.sponsor || '');
+      adEls.hd.textContent = o.headline || '';
+      adEls.tg.textContent = o.tagline || '';
+      const href = o.url || o.mail || '';
+      adEls.go.style.display = href ? '' : 'none';
+      if (href) adEls.go.setAttribute('href', href); else adEls.go.removeAttribute('href');
+      adEls.cta.textContent = o.cta || (o.url ? 'Visit website' : 'Get in touch');
+      adEls.note.textContent = o.url ? 'Opens ' + o.url.replace(/^https:\/\/(www\.)?/, '').replace(/\/$/, '') +
+        ' in a new tab.' : (o.mail ? 'Opens your email app.' : '');
+      adOnClose = o.onClose || null;
+      adOnVisit = o.onVisit || null;
+      adCard.classList.add('on');
+      r.classList.add('menu-open');
+      adOpen = true;
+      try { (href ? adEls.go : adEls.close).focus(); } catch (e) {}
+    }
+    function hideAdCard() {
+      if (!adOpen) return;
+      adOpen = false;
+      adCard.classList.remove('on');
+      if (!introOpen) r.classList.remove('menu-open');
+      const cb = adOnClose; adOnClose = null;
+      if (cb) cb();
+    }
+    adEls.close.addEventListener('click', hideAdCard);
+    adEls.go.addEventListener('click', function () { if (adOnVisit) adOnVisit(); });
+    adCard.addEventListener('mousedown', function (e) { if (e.target === adCard) hideAdCard(); });
 
     // sea state
     const sea = el('div', 'blb-plaque blb-sea');
@@ -1323,7 +1392,7 @@
           '<div>' + K('WASD') + ' walk</div><div>' + K('SHIFT') + ' run</div>' +
           '<div>' + K('SPACE') + ' jump</div><div>' + K('CLICK') + ' lay a balata</div>' +
           '<div>' + K('HOLD CLICK') + ' lay a row</div><div>' + K('HOLD E') + ' shovel mouna</div>' +
-          '<div>' + K('E') + ' talk / buy food</div><div>' + K('V') + ' first / third person</div>' +
+          '<div>' + K('E') + ' talk / buy food / open a billboard</div><div>' + K('V') + ' first / third person</div>' +
           '<div>' + K('[') + K(']') + ' mouse sensitivity</div><div>' + K('M') + ' sound</div>' +
           '<div>' + K('ESC') + ' pause menu</div><div>' + K('SCROLL') + ' zoom</div>' +
           '</div></div>' + back;
@@ -1469,6 +1538,7 @@
     paintMenu();
     r.appendChild(hurtEl);
     r.appendChild(faint);
+    r.appendChild(adCard);
     r.appendChild(intro);
 
     /* ================================================================== api */
@@ -1828,6 +1898,9 @@
       hurt: hurt,
       showFaint: showFaint,
       hideFaint: hideFaint,
+      showAdCard: showAdCard,
+      hideAdCard: hideAdCard,
+      isAdCardOpen: function () { return adOpen; },
       setLoading: setLoading,
       frame: frame,
       // extras, all optional for the orchestrator

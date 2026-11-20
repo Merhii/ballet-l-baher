@@ -151,6 +151,9 @@
           <select id="layout"><option value="poster">Poster</option><option value="split">Split</option><option value="stamp">Stamp</option></select></label>
         <label class="f">Weight <small id="weightV"></small><small>how often it comes up against other ads (0 pauses it)</small>
           <input type="range" id="weight" min="0" max="10" step="1"></label>
+        <label class="f">Link<small>where “Visit” goes when a player presses E at the board (https only)</small>
+          <input type="text" id="url" maxlength="400" placeholder="https://"></label>
+        <label class="f">Button text<small>e.g. Visit PuzzleBooth</small><input type="text" id="cta" maxlength="30"></label>
         <label class="f">Runs from<small>empty = no start date</small><input type="date" id="start"></label>
         <label class="f">Runs until<small>empty = no end date</small><input type="date" id="end"></label>
       </div>
@@ -286,7 +289,7 @@
   }
 
   // --------------------------------------------------------------- editor
-  var fields = ['sponsor', 'ar', 'headline', 'tagline', 'layout', 'weight', 'start', 'end', 'bg', 'fg', 'accent'];
+  var fields = ['sponsor', 'ar', 'headline', 'tagline', 'layout', 'weight', 'url', 'cta', 'start', 'end', 'bg', 'fg', 'accent'];
   function renderEditor() {
     var has = ads.length > 0;
     $('editor').classList.toggle('hide', !has);
@@ -300,8 +303,9 @@
     $('edTitle').textContent = 'Edit · ' + a.sponsor;
     var stats = A.readStats();
     $('idNote').textContent = 'id: ' + a.id;
-    $('impNote').textContent = ((stats[a.id] && stats[a.id].imp) || 0) +
-      ' impressions counted in this browser (game played here, board on screen).';
+    $('impNote').textContent = ((stats[a.id] && stats[a.id].imp) || 0) + ' views and ' +
+      ((stats[a.id] && stats[a.id].open) || 0) + ' opens (E at the board) counted in this browser.' +
+      (a.url ? '' : ' No link set: the card opens without a Visit button.');
     var pl = $('placements'); pl.innerHTML = '';
     A.PLACEMENTS.forEach(function (p) {
       var l = document.createElement('label');

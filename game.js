@@ -683,6 +683,17 @@
       updateHint();
     });
 
+    /* E (or TALK on a phone): a person beside you first, then — unless you
+       are at a pile, where E is the shovel — the billboard you are facing. */
+    function interact() {
+      var near = nearestNPC();
+      if (near) { talkTo(near.npc); return true; }
+      if (nearestPile()) return false;
+      var b = boardInView();
+      if (b) { openBoard(b); return true; }
+      return false;
+    }
+
     function setSens(v, quiet) {
       look.sens = clamp(v, 0.0006, 0.0066);
       SET.sens = +(look.sens / 0.0022).toFixed(2);
@@ -711,6 +722,12 @@
     function onKey(e, down) {
       var c = e.code;
       var was = keys[c];
+      // the billboard card: E or Esc puts it away, nothing else gets through
+      if (adCardOpen) {
+        if (down && !was && (c === 'Escape' || c === 'KeyE' || c === 'KeyP')) hud.hideAdCard();
+        keys[c] = down;            // tracked, so a held E does not re-open it
+        return;
+      }
       if (down && (c === 'Escape' || c === 'KeyP')) {
         if (!was) {
           if (hud.isMenuOpen && hud.isMenuOpen()) {
@@ -728,8 +745,7 @@
       if (!down) return;
       if (S.fainted) return;
       if (c === 'KeyE' && !was && S.started) {
-        var near = nearestNPC();
-        if (near) { talkTo(near.npc); return; }   // E is talk when someone is beside you
+        if (interact()) return;
       }
       if (c === 'KeyV') setView(!firstPerson);
       if (c === 'BracketLeft') { setSens(look.sens * 0.84); return; }
@@ -886,8 +902,7 @@
       tTalk = wrap.querySelector('#ttalk');
       tTalk.addEventListener('pointerdown', function (e) {
         e.preventDefault();
-        var near = nearestNPC();
-        if (near) talkTo(near.npc);
+        interact();
       });
       var lay = wrap.querySelector('#tlay'), dig = wrap.querySelector('#tdig');
       lay.addEventListener('pointerdown', function () { sfx.unlock(); placing = true; });
@@ -963,8 +978,17 @@
       digging = false;
       var pile = nearestPile();
       var who = nearestNPC();
+      var board = (!who && !pile) ? boardInView() : null;
       // whoever is closer wins the E key
-      if (tTalk) tTalk.style.display = who ? 'block' : 'none';
+      if (tTalk) {
+        tTalk.style.display = (who || board) ? 'block' : 'none';
+        tTalk.textContent = board ? 'OPEN AD' : 'TALK';
+      }
+      if (board) {
+        var bl = board.ad ? 'open the billboard · ' + board.ad.sponsor : 'this billboard is for rent';
+        hud.setPrompt(IS_TOUCH ? bl : 'E — ' + bl);
+        return;
+      }
       if (who && (!pile || who.dist < 2.6)) {
         var food = who.npc.def.sells && FOODS[who.npc.def.sells];
         var label = food
@@ -1506,6 +1530,51 @@
         ADS.load(function (list, source) { setAds(list, source); hud.toast('Billboards updated from the CMS.', 'info'); });
       });
     }
+    /* The board you are standing in front of and looking at, if any — that
+       is the one E opens. Close enough to read, on its printed side, and
+       within ~35° of where you are looking. */
+    var fwdTmp = new THREE.Vector3(), toTmp = new THREE.Vector3();
+    function boardInView() {
+      if (!boards.length || !S.started) return null;
+      camera.getWorldDirection(fwdTmp);
+      var best = null, bestDot = 0.82;
+      for (var i = 0; i < boards.length; i++) {
+        var s = boards[i].slot;
+        var dx = body.pos.x - s.x, dz = body.pos.z - s.z;
+        if (Math.sqrt(dx * dx + dz * dz) > s.w * 0.9 + 4) continue;
+        if (dx * Math.sin(s.ry || 0) + dz * Math.cos(s.ry || 0) < 0.5) continue;   // behind it
+        toTmp.set(s.x, s.y + s.h / 2, s.z).sub(camera.position).normalize();
+        var dot = toTmp.dot(fwdTmp);
+        if (dot > bestDot) { bestDot = dot; best = boards[i]; }
+      }
+      return best;
+    }
+    var adCardOpen = false;
+    function openBoard(b) {
+      var vacant = !b.ad, ad = b.ad || HOUSE_AD;
+      var image = '';
+      try { image = b.canvas.toDataURL('image/png'); } catch (e) { /* tainted or headless */ }
+      adCardOpen = true;
+      paused = true;
+      keys = {}; placing = false;
+      releaseLook();
+      hud.setPrompt(null);
+      if (!vacant) ADS.bump(ad.id, 'open');
+      sfx.ui();
+      hud.showAdCard({
+        image: image, sponsor: ad.sponsor, headline: ad.headline, tagline: ad.tagline,
+        url: vacant ? '' : ad.url, cta: ad.cta, mail: vacant ? HOUSE_AD.mail : '', vacant: vacant,
+        onClose: function () {
+          adCardOpen = false;
+          paused = false;
+          clock.getDelta();
+          if (firstPerson) requestLook();
+          updateHint();
+        }
+      });
+      updateHint();
+    }
+
     var boardV = new THREE.Vector3();
     function updateBoards(dt) {
       if (!boards.length) return;

@@ -7,7 +7,8 @@
       "headline": "Photobooths for weddings & events across Lebanon", "ar": "",
       "tagline": "Mirror · 360 · Mosaic  —  puzzleslb.com/puzzlebooth", "layout": "poster",
       "bg": "#000000", "fg": "#FFFFFF", "accent": "#34AD54",
-      "placements": ["corniche-w"], "weight": 1, "start": "", "end": ""
+      "placements": ["corniche-w"], "weight": 1, "start": "", "end": "",
+      "url": "https://www.puzzleslb.com/puzzlebooth/", "cta": "Visit PuzzleBooth"
     }
   ]
 }

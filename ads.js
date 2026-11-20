@@ -34,7 +34,8 @@
       headline: 'Photobooths for weddings & events across Lebanon', ar: '',
       tagline: 'Mirror · 360 · Mosaic  —  puzzleslb.com/puzzlebooth', layout: 'poster',
       bg: '#000000', fg: '#FFFFFF', accent: '#34AD54',
-      placements: ['corniche-w'], weight: 1, start: '', end: ''
+      placements: ['corniche-w'], weight: 1, start: '', end: '',
+      url: 'https://www.puzzleslb.com/puzzlebooth/', cta: 'Visit PuzzleBooth'
     }
   ];
 
@@ -44,8 +45,16 @@
     headline: 'Your brand on the Saida corniche.', ar: 'إعلانك هون قريبًا',
     tagline: 'Inquire in Credits  ·  mmerhikarim@gmail.com', layout: 'poster',
     bg: '#E4D7B3', fg: '#0B3A4F', accent: '#F2B733',
-    placements: [], weight: 0, start: '', end: ''
+    placements: [], weight: 0, start: '', end: '',
+    url: '', cta: 'Email to book this board',
+    mail: 'mailto:mmerhikarim@gmail.com?subject=' + encodeURIComponent('Billboard on Ballet l Ba7er')
   };
+
+  // only plain web links: a player pressing E must never be sent anywhere odd
+  function safeUrl(u) {
+    u = str(u, 400).trim();
+    return /^https:\/\/[^\s"'<>]+$/i.test(u) ? u : '';
+  }
 
   // ---------------------------------------------------------------- helpers
   function str(v, max) {
@@ -89,7 +98,9 @@
         placements: pl,
         weight: Math.max(0, Math.min(10, Number(a.weight) || 1)),
         start: str(a.start, 10),
-        end: str(a.end, 10)
+        end: str(a.end, 10),
+        url: safeUrl(a.url),          // where "Visit" goes when a player presses E at the board
+        cta: str(a.cta, 30)
       });
     }
     return out;
@@ -265,17 +276,19 @@
     try { localStorage.removeItem(PREVIEW_KEY); } catch (e) { /* ignore */ }
   }
 
-  /* Impressions — an ad that was actually on screen on a billboard — counted
-     in THIS browser only; the game has no server. */
+  /* Impressions (an ad actually on screen on a billboard) and opens (a player
+     pressed E at it), counted in THIS browser only; the game has no server. */
   function readStats() {
     try { return JSON.parse(localStorage.getItem(STATS_KEY) || '{}') || {}; }
     catch (e) { return {}; }
   }
-  function bump(id) {
+  // kind: 'imp' (seen on a board) or 'open' (a player pressed E to open it)
+  function bump(id, kind) {
     try {
       var s = readStats();
-      var r = s[id] || (s[id] = { imp: 0 });
-      r.imp = (r.imp || 0) + 1;
+      var r = s[id] || (s[id] = { imp: 0, open: 0 });
+      var k = kind === 'open' ? 'open' : 'imp';
+      r[k] = (r[k] || 0) + 1;
       localStorage.setItem(STATS_KEY, JSON.stringify(s));
     } catch (e) { /* private window */ }
   }
