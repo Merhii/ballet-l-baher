@@ -1,6 +1,6 @@
 # Windows twin of build.sh, for machines without Python. Same outputs:
 #   dist/artifact.html, dist/local.html, dist/standalone/index.html, docs/index.html
-# plus the billboard CMS (cms.html, ads.js, ads.json) copied into docs/.
+# plus ads.json copied into docs/. The CMS stays out of docs/ on purpose.
 $ErrorActionPreference = 'Stop'
 Set-Location -LiteralPath $PSScriptRoot
 $utf8 = New-Object System.Text.UTF8Encoding($false)
@@ -43,9 +43,10 @@ if (Test-Path $threeSrc) {
   foreach ($n in 'favicon.svg', 'logo-trowel.svg') {
     if (Test-Path "brand/$n") { Write-Text "docs/$n" (Read-Text "brand/$n") }
   }
-  foreach ($n in 'cms.html', 'ads.js', 'ads.json') {
-    if (Test-Path $n) { Write-Text "docs/$n" (Read-Text $n) }
-  }
+  # the ad list ships with the game; the CMS (cms.html) deliberately does not:
+  # it is the owner's tool, opened locally from the repo
+  if (Test-Path 'ads.json') { Write-Text 'docs/ads.json' (Read-Text 'ads.json') }
+  foreach ($n in 'docs/cms.html', 'docs/ads.js') { if (Test-Path $n) { Remove-Item $n } }
   '{0:N1} KB  standalone/index.html + docs/index.html (three.js inlined)' -f ($page.Length / 1024)
 } else {
   "standalone skipped: $threeSrc not found"

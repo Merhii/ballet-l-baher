@@ -75,11 +75,15 @@ if os.path.exists(THREE_SRC):
         if os.path.exists(src):
             io.open(os.path.join('docs', name), 'w', encoding='utf-8').write(
                 io.open(src, encoding='utf-8').read())
-    # the billboard CMS and the ad list it publishes ride along with the game
-    for name in ('cms.html', 'ads.js', 'ads.json'):
+    # the ad list ships with the game; the CMS (cms.html) deliberately does not
+    # -- it is the owner's tool and is opened locally from the repo
+    for name in ('ads.json',):
         if os.path.exists(name):
             io.open(os.path.join('docs', name), 'w', encoding='utf-8').write(
                 io.open(name, encoding='utf-8').read())
+    for stale in ('docs/cms.html', 'docs/ads.js'):
+        if os.path.exists(stale):
+            os.remove(stale)
     print('standalone/index.html + docs/index.html %.1f KB'
           ' (three.js inlined; fonts still from Google)' % (len(page) / 1024.0))
 else:

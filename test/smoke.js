@@ -399,7 +399,9 @@ check('food courts + billboard sites', () => {
   const fc = world.foodCourts || [];
   if (fc.length < 2) throw new Error('expected 2 food courts, got ' + fc.length);
   const stalls = fc.reduce((n, c) => n + c.stalls.length, 0);
-  if (stalls < 6) throw new Error('expected 6 stalls, got ' + stalls);
+  // the west court is shuttered: its stalls sell nothing and are not listed
+  if (stalls !== 3) throw new Error('expected 3 open stalls, got ' + stalls);
+  if (!fc.some(c => c.closed && !c.stalls.length)) throw new Error('no closed court');
   for (const c of fc) for (const s of c.stalls) {
     if (s.z > -2 || s.z < -34 || Math.abs(s.x) > 128) throw new Error('stall off the deck: ' + s.id);
   }

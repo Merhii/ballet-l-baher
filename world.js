@@ -1550,24 +1550,25 @@
       id: 'souk', name: 'Souk el Akel', ar: 'سوق الأكل', sub: 'FOOD COURT · EAST',
       cx: 42, cz: -26,
       stalls: [
-        { id: 'manoushe', ar: 'فرن أبو فادي', sub: 'MANAKISH · ZA3TAR', prop: 'furn',
-          bg: '#3F6B3A', fg: '#EDF6F3', awn: ['PALM_GREEN', 'FOAM'] },
-        { id: 'shawarma', ar: 'شاورما زيري', sub: 'SHAWARMA · DJEJ W LA7MA', prop: 'spit',
-          bg: '#8C4A2F', fg: '#F6C445', awn: ['RUST', 'SUN'] },
-        { id: 'falafel', ar: 'فلافل المينا', sub: 'FALAFEL · SINCE FOREVER', prop: 'fryer',
-          bg: '#F2B733', fg: '#0B3A4F', awn: ['HAZARD', 'SEA_DEEP'] }
+        { id: 'samra', ar: 'حلويات السمرا', sub: 'HELWAYET EL SAMRA · SWEETS & BOUZA', prop: 'sweets',
+          bg: '#B9502F', fg: '#F6C445', awn: ['TERRACOTTA', 'FOAM'] },
+        { id: 'soubras', ar: 'SOUBRAS', sub: 'SANDWICHES · SNACKS', prop: 'spit',
+          bg: '#0B3A4F', fg: '#F2B733', awn: ['SEA_DEEP', 'SUN'] },
+        { id: 'akkawi', ar: 'فلافل عكاوي', sub: 'FALAFEL AKKAWI', prop: 'fryer',
+          bg: '#3F6B3A', fg: '#EDF6F3', awn: ['PALM_GREEN', 'FOAM'] }
       ]
     },
     {
-      id: 'qalaa', name: 'Sahet el Qal3a', ar: 'ساحة القلعة', sub: 'FOOD COURT · WEST',
-      cx: -62, cz: -26,
+      // shut for now: shutters down, signs up, nobody behind the counters
+      id: 'qalaa', name: 'Sahet el Qal3a', ar: 'ساحة القلعة', sub: 'FOOD COURT · OPENING SOON',
+      cx: -62, cz: -26, closed: true,
       stalls: [
-        { id: 'samke', ar: 'صيّادية البحر', sub: 'SAMAK · SAYYADIYEH', prop: 'fish',
-          bg: '#16708C', fg: '#EDF6F3', awn: ['SEA_MID', 'FOAM'] },
-        { id: 'jallab', ar: 'جلّاب وعصير', sub: 'JALLAB · 3ASIR · TALJ', prop: 'jugs',
-          bg: '#0A1A33', fg: '#F2B733', awn: ['NIGHT_TOP', 'SUN'] },
-        { id: 'kaake', ar: 'كعكة صيدا', sub: 'KA3KE · BA2DOUNES', prop: 'kaake',
-          bg: '#E4D7B3', fg: '#B9502F', awn: ['TERRACOTTA', 'LIMESTONE'] }
+        { id: 'soon-1', ar: 'قريبًا', sub: 'COMING SOON · STALL FOR RENT', prop: 'shutter',
+          bg: '#E4D7B3', fg: '#0B3A4F', awn: ['CEMENT', 'LIMESTONE'] },
+        { id: 'soon-2', ar: 'قريبًا', sub: 'COMING SOON · STALL FOR RENT', prop: 'shutter',
+          bg: '#E4D7B3', fg: '#0B3A4F', awn: ['CEMENT', 'LIMESTONE'] },
+        { id: 'soon-3', ar: 'قريبًا', sub: 'COMING SOON · STALL FOR RENT', prop: 'shutter',
+          bg: '#E4D7B3', fg: '#0B3A4F', awn: ['CEMENT', 'LIMESTONE'] }
       ]
     }
   ];
@@ -1594,7 +1595,8 @@
       const g = new T.Group();
       g.name = 'foodcourt-' + fc.id;
       const SZ = fc.cz - 1;                       // stall centre line
-      const court = { id: fc.id, name: fc.name, ar: fc.ar, x: fc.cx, y: FLOOR, z: fc.cz + 6, stalls: [] };
+      const court = { id: fc.id, name: fc.name, ar: fc.ar, x: fc.cx, y: FLOOR, z: fc.cz + 6,
+        closed: !!fc.closed, stalls: [] };
 
       // a poured slab under the whole court, so it reads as one place
       m.box(vary(mixc(C0.LIMESTONE, C0.CEMENT, 0.4, c), rng, 0.04, c),
@@ -1626,19 +1628,40 @@
         }
         // the food, on and behind the counter
         const top = FLOOR + 1.1, cz = SZ + 1.5;
-        if (st.prop === 'furn') {
+        if (st.prop === 'shutter') {
+          // a rolled-down steel shutter over the whole opening, and its box
+          for (let k = 0; k < 13; k++) {
+            m.box(vary(mixc(C0.CEMENT, C0.STONE_DARK, k % 2 ? 0.15 : 0.32, c), rng, 0.04, c),
+              SX, FLOOR + 0.12 + k * 0.205, SZ + 1.85, 4.9, 0.2, 0.08);
+          }
+          m.box(mixc(C0.CEMENT, C0.NIGHT_TOP, 0.25, c), SX, FLOOR + 2.85, SZ + 1.85, 5.1, 0.32, 0.36);
+          mf.box(mixc(C0.RUST, C0.STONE_DARK, 0.4, c), SX + 1.6, FLOOR + 0.35, SZ + 1.92, 0.4, 0.12, 0.06);
+        } else if (st.prop === 'sweets') {
+          // copper trays of knefe and baklawa, and tubs of bouza under glass
+          const copper = mixc(C0.RUST, C0.SUN, 0.42, new T.Color());
+          for (let k = 0; k < 3; k++) {
+            mf.prim(PRIM.cyl12, copper, SX - 1.7 + k * 1.1, top + 0.04, cz, 0.95, 0.08, 0.95);
+            mf.prim(PRIM.cyl12, k === 1 ? mixc(C0.PALM_LIGHT, C0.SUN, 0.4, c) : mixc(C0.TERRACOTTA, C0.SUN, 0.55, c),
+              SX - 1.7 + k * 1.1, top + 0.1, cz, 0.85, 0.05, 0.85);
+          }
+          m.box(mixc(C0.FOAM, C0.SKY_HAZE, 0.5, c), SX + 1.6, top + 0.22, cz, 1.4, 0.44, 0.62);
+          for (let k = 0; k < 3; k++) {
+            mf.prim(PRIM.cyl12, [C0.FOAM, C0.PALM_LIGHT, C0.SHIRT][k], SX + 1.15 + k * 0.45, top + 0.46, cz, 0.36, 0.08, 0.36);
+          }
+        } else if (st.prop === 'furn') {
           m.prim(PRIM.dome, mixc(C0.TERRACOTTA, C0.STONE_DARK, 0.3, c), SX - 1.2, FLOOR + 0.2, SZ - 0.6, 2.4, 2.6, 2.4);
           mf.prim(PRIM.disc || PRIM.cyl12, C0.NIGHT_TOP, SX - 1.2, FLOOR + 0.9, SZ + 0.55, 0.9, 0.6, 0.1, Math.PI / 2, 0, 0);
           for (let k = 0; k < 5; k++) {
             mf.prim(PRIM.cyl12, mixc(C0.PALM_GREEN, C0.LIMESTONE, 0.45, c), SX + 0.2 + (k % 3) * 0.75, top + 0.03 + ((k / 3) | 0) * 0.05, cz + ((k / 3) | 0) * 0.15, 0.62, 0.04, 0.62);
           }
         } else if (st.prop === 'spit') {
+          // spits and their heat panel stand against the back wall, behind the vendor
           for (let k = 0; k < 2; k++) {
-            const px = SX - 1.4 + k * 1.2;
-            mf.prim(PRIM.cyl6, C0.CEMENT, px, top + 0.75, SZ + 0.9, 0.06, 1.6, 0.06);
-            mf.prim(PRIM.cone8, mixc(C0.RUST, C0.SUN, 0.25 + k * 0.2, c), px, top + 0.7, SZ + 0.9, 0.62, 1.1, 0.62, Math.PI, 0, 0);
+            const px = SX - 1.6 + k * 3.2;
+            mf.prim(PRIM.cyl6, C0.CEMENT, px, top + 0.75, SZ - 1.0, 0.06, 1.6, 0.06);
+            mf.prim(PRIM.cone8, mixc(C0.RUST, C0.SUN, 0.25 + k * 0.2, c), px, top + 0.7, SZ - 1.0, 0.62, 1.1, 0.62, Math.PI, 0, 0);
           }
-          mf.box(mixc(C0.CEMENT, C0.NIGHT_TOP, 0.3, c), SX - 0.8, top + 0.7, SZ + 0.35, 2.3, 1.4, 0.12);
+          mf.box(mixc(C0.CEMENT, C0.NIGHT_TOP, 0.3, c), SX, top + 0.7, SZ - 1.45, 4.4, 1.4, 0.12);
           for (let k = 0; k < 6; k++) {
             mf.prim(PRIM.cyl8, mixc(C0.LIMESTONE, C0.FOAM, 0.4, c), SX + 0.9 + (k % 3) * 0.3, top + 0.06, cz - 0.1 + ((k / 3) | 0) * 0.25, 0.12, 0.12, 0.6, 0, 0.3, Math.PI / 2);
           }
@@ -1668,10 +1691,13 @@
             mf.prim(PRIM.torus, mixc(C0.SUN, C0.TRUNK, 0.3, c), SX - 1.4 + k * 0.6, top + 0.05, cz, 0.7, 0.7, 0.7, Math.PI / 2, 0, 0);
           }
         }
+        // the sign is a fascia on the awning's front edge, above the vendor's
+        // head, so whoever is behind the counter stays in plain view
         signPlane({ w: 1024, h: 256, ar: st.ar, sub: st.sub, bg: st.bg, fg: st.fg,
-          border: 'rgba(237,246,243,0.6)' }, 5.0, 1.25, SX, FLOOR + 2.25, SZ + 2.05, 0, g);
+          border: 'rgba(237,246,243,0.6)' }, 5.4, 1.1, SX, FLOOR + 3.15, SZ + 2.92, 0, g);
         coll(SX - 2.9, SZ - 2.0, SX + 2.9, SZ + 2.0, FLOOR + 3.37);
-        court.stalls.push({ id: st.id, ar: st.ar, x: SX, y: FLOOR, z: SZ + 2.9 });
+        // a shuttered stall sells nothing, so the game puts nobody there
+        if (st.prop !== 'shutter') court.stalls.push({ id: st.id, ar: st.ar, x: SX, y: FLOOR, z: SZ + 2.9 });
       }
 
       // tables and chairs in front, a parasol on every other table
@@ -1687,7 +1713,7 @@
             const a = k * Math.PI / 2 + rng() * 0.4;
             chairMesher(mf, pc, tx + Math.sin(a) * 1.05, FLOOR, tz + Math.cos(a) * 1.05, a + Math.PI, 0);
           }
-          if ((row + col) % 2 === 0) {
+          if ((row + col) % 2 === 0 && !fc.closed) {
             mf.prim(PRIM.cyl6, C0.CEMENT, tx, FLOOR + 1.6, tz, 0.07, 1.7, 0.07);
             mf.prim(PRIM.cone8, (row ? C0.TERRACOTTA : C0.SEA_SHALLOW).clone(), tx, FLOOR + 2.55, tz, 3.0, 0.55, 3.0);
           }
@@ -1715,7 +1741,8 @@
       g.add(bake(m, W.MAT.plaster, 'foodcourtShell-' + fc.id));
       g.add(bake(mf, W.MAT.flat, 'foodcourtFittings-' + fc.id));
       const glow = bake(mg, W.MAT.glowOff, 'foodcourtBulbs-' + fc.id);
-      if (glow) { W.group.remove(glow); g.add(glow); W.night.push(glow); }
+      // a closed court's bulbs never come on
+      if (glow) { W.group.remove(glow); g.add(glow); if (!fc.closed) W.night.push(glow); }
       out.push({ group: g, court: court });
     }
     return out;
@@ -1726,12 +1753,16 @@
      edge, `ry` its facing (0 = toward open sea), w×h its face in metres. */
   function adSlotList() {
     return [
-      // `base` is what the legs stand on: deck, a stall roof, the mole's top
-      { id: 'corniche-w', placement: 'corniche-w', x: -16, base: 1.5, y: 5.0, z: -32.2, ry: 0, w: 9, h: 4.5 },
-      { id: 'corniche-e', placement: 'corniche-e', x: 31, base: 1.5, y: 5.0, z: -32.6, ry: 0, w: 9, h: 4.5 },
-      { id: 'souk', placement: 'souk', x: FOOD_COURTS[0].cx, base: 4.87, y: 5.6, z: FOOD_COURTS[0].cz - 2.6, ry: 0, w: 8, h: 4 },
-      { id: 'qalaa', placement: 'qalaa', x: FOOD_COURTS[1].cx, base: 4.87, y: 5.6, z: FOOD_COURTS[1].cz - 2.6, ry: 0, w: 8, h: 4 },
-      { id: 'harbour', placement: 'harbour', x: -50, base: 2.3, y: 3.2, z: 51, ry: 2.12, w: 12, h: 6 }
+      /* `base` is what the legs stand on: deck, a stall roof, the mole's top.
+         The corniche hoardings stand well clear of z = -32, where the city's
+         ground slab starts at board height and would swallow them. The roof
+         boards sit high enough to clear the parasols and the gateway sign. */
+      { id: 'corniche-w', placement: 'corniche-w', x: -15, base: 1.5, y: 4.2, z: -26.5, ry: 0, w: 9, h: 4.5 },
+      { id: 'corniche-e', placement: 'corniche-e', x: 7, base: 1.5, y: 4.2, z: -26.5, ry: 0, w: 9, h: 4.5 },
+      { id: 'souk', placement: 'souk', x: FOOD_COURTS[0].cx, base: 4.87, y: 7.2, z: FOOD_COURTS[0].cz - 2.6, ry: 0, w: 9, h: 4.5 },
+      { id: 'qalaa', placement: 'qalaa', x: FOOD_COURTS[1].cx, base: 4.87, y: 7.2, z: FOOD_COURTS[1].cz - 2.6, ry: 0, w: 9, h: 4.5 },
+      // on a concrete plinth of its own, so it plainly stands on the mole
+      { id: 'harbour', placement: 'harbour', x: -50, base: 1.2, plinth: true, y: 5.0, z: 51, ry: 2.12, w: 14, h: 7 }
     ];
   }
 

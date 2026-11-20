@@ -57,61 +57,44 @@
      working after you eat. Knefe stays at Jardali's. */
   var FOODS = {
     knefe:    { name: 'Knefe b jebne',   ar: 'كنافة',   price: KNEFE_PRICE, sta: KNEFE_HEAL, hp: 10 },
-    manoushe: { name: 'Manoushe za3tar', ar: 'منقوشة',  price: 8,  sta: 18, hp: 4 },
-    falafel:  { name: 'Falafel sandwich', ar: 'فلافل',  price: 12, sta: 24, hp: 10 },
-    shawarma: { name: 'Shawarma',        ar: 'شاورما',  price: 30, sta: 35, hp: 22,
+    // Souk el Akel
+    samra:    { name: 'Bouza w helou',    ar: 'حلويات السمرا', price: 10, sta: 16, hp: 6,
+                buff: { id: 'barid', label: 'Bouza · cool', t: 90 } },
+    soubras:  { name: 'Soubras sandwich', ar: 'SOUBRAS',       price: 30, sta: 35, hp: 22,
                 buff: { id: 'shab3an', label: 'Shab3an · heals', t: 60 } },
-    samke:    { name: 'Sayyadiyeh',      ar: 'صيّادية', price: 40, sta: 25, hp: 45 },
-    jallab:   { name: 'Jallab',          ar: 'جلّاب',   price: 6,  sta: 10, hp: 0,
-                buff: { id: 'barid', label: 'Jallab · cool', t: 90 } },
-    kaake:    { name: 'Ka3ke',           ar: 'كعكة',    price: 5,  sta: 12, hp: 2 }
+    akkawi:   { name: 'Falafel Akkawi',   ar: 'فلافل عكاوي',  price: 12, sta: 24, hp: 12 }
   };
 
-  /* The people behind the food-court counters, keyed by what they sell. */
+  /* The people behind the Souk el Akel counters, keyed by what they sell.
+     These are real Saida names, so the bubbles carry the shop's name and
+     nobody is given invented facts or invented staff. */
   var VENDORS = {
-    manoushe: { name: 'Abou Fadi', voice: 1, hat: 'cap', shirt: 0xe8e2d4, hatCol: 0x3f6b3a, lines: {
-      greet: [{ t: 'Manoushe? Lessa tal3a mn el furn.', ar: 'طالعة من الفرن' }],
-      idle: [{ t: 'Za3tar men el jabal. Zét men el day3a.', ar: 'زعتر من الجبل' },
-             { t: 'Kol, ba3dén ballet. Hék el tartib.', ar: 'هيك الترتيب' }],
-      sold: [{ t: 'Sa7tein. Ma fi a7la.', ar: 'صحتين' }, { t: 'Hay ma3 khyar w na3na3.', ar: 'خيار ونعنع' }],
-      pricey: [{ t: 'Tmen lira. Ballet shwayy w rja3.', ar: 'تمن ليرات' }],
-      full: [{ t: 'Inta mesh ja3an. Ana ba3ref.', ar: 'مش جوعان' }] } },
-    shawarma: { name: 'Ziad', voice: 2, hat: 'cap', shirt: 0xb9502f, hatCol: 0x8c4a2f, lines: {
-      greet: [{ t: 'Djej aw la7me? Fi toum ktir.', ar: 'دجاج أو لحمة؟' }],
-      idle: [{ t: 'El sikh 3am ydour men el sob7.', ar: 'السيخ عم يدور' },
-             { t: 'Ma bta3ref tballet 3a ma3de faadye.', ar: 'معدة فاضية' }],
-      sold: [{ t: 'Hay. Btedfik sa3a.', ar: 'بتدفّيك ساعة' }, { t: 'Toum ziyéde, ma 2ellak la 7ada.', ar: 'توم زيادة' }],
+    samra: { name: 'Helwayet el Samra', voice: 3, hat: 'cap', shirt: 0xe8e2d4, hatCol: 0xb9502f, lines: {
+      greet: [{ t: 'Ahla! Bouza aw helou? Aw el tnein?', ar: 'بوظة أو حلو؟' }],
+      idle: [{ t: 'Bouza 3arabiye, b festo2. Btberrdak.', ar: 'بوظة عربية' },
+             { t: 'Ma fi shi byeli2 3al ba7er mitl el helou.', ar: 'مثل الحلو' }],
+      sold: [{ t: 'Sa7tein! Hay btberrdak sa3a w nos.', ar: 'صحتين' },
+             { t: 'Zedtellak festo2. Ma t2oul la 7ada.', ar: 'فستق زيادة' }],
+      pricey: [{ t: '3ashra lira. Ballet shwayy w rja3.', ar: 'عشر ليرات' }],
+      full: [{ t: 'Khalas, kelt helou kfeye. Rou7 shtghol.', ar: 'كلت كفاية' }] } },
+    soubras: { name: 'Soubras', voice: 2, hat: 'cap', shirt: 0x0b3a4f, hatCol: 0xf2b733, lines: {
+      greet: [{ t: 'Sandwich? 3al nar, halla2.', ar: 'ساندويش؟' }],
+      idle: [{ t: 'Ma bta3ref tballet 3a ma3de faadye.', ar: 'معدة فاضية' },
+             { t: 'Toum? Akid toum.', ar: 'توم؟' }],
+      sold: [{ t: 'Hay. Btedfik sa3a.', ar: 'بتدفّيك' },
+             { t: 'Sa7tein. W ba3dén ballet.', ar: 'صحتين' }],
       pricey: [{ t: 'Tlétin lira ya 3ammi. Mesh balash.', ar: 'تلاتين ليرة' }],
       full: [{ t: 'Wa2ef, wa2ef. Kelt ktir.', ar: 'كلت كتير' }] } },
-    falafel: { name: 'Im Rami', voice: 3, hat: 'scarf', shirt: 0x3b5c73, hatCol: 0xf2b733, lines: {
-      greet: [{ t: 'Falafel skhoun, ya habibi.', ar: 'فلافل سخنة' }],
-      idle: [{ t: 'Tarator men 3ende. El wasfe sirr.', ar: 'الوصفة سر' },
-             { t: 'Ibni kamén kén ballet. Halla2 bi Dubai.', ar: 'هلّق بدبي' }],
-      sold: [{ t: 'Sa7tein 3a 2albak.', ar: 'صحتين على قلبك' }, { t: 'Zedtellak wa7de. Ma t2oul.', ar: 'زدتلّك وحدة' }],
+    akkawi: { name: 'Falafel Akkawi', voice: 1, hat: 'none', shirt: 0x3f6b3a, hatCol: 0x2b2420, lines: {
+      greet: [{ t: 'Falafel skhoun! Sandwich?', ar: 'فلافل سخنة' }],
+      idle: [{ t: 'Tarator, kabis, ba2dounes. Bass hék.', ar: 'بس هيك' },
+             { t: 'Ballet el ba7er 3a ma3de faadye? La2. Kol.', ar: 'كول' }],
+      sold: [{ t: 'Sa7tein 3a 2albak.', ar: 'صحتين على قلبك' },
+             { t: 'Zedtellak wa7de. Ma t2oul.', ar: 'زدتلّك وحدة' }],
       pricey: [{ t: 'Tna3sh lira. Ta3a ba3dén.', ar: 'تنعش ليرة' }],
-      full: [{ t: 'Shab3an? Mnih. Rou7 shtghol.', ar: 'شبعان؟' }] } },
-    samke: { name: 'Abou Hassan', voice: 0, hat: 'none', shirt: 0x16708c, hatCol: 0x2b2420, lines: {
-      greet: [{ t: 'Samak el yom. Wallah el yom.', ar: 'سمك اليوم' }],
-      idle: [{ t: 'Sayyadiyeh b ruz w basal. Mitl ayyém zamén.', ar: 'متل أيام زمان' },
-             { t: 'El ba7er bya3tik samak. W byekhod balat. 3adel.', ar: 'عادل' }],
-      sold: [{ t: 'Kol. Hay bterja3lak el rou7.', ar: 'بترجعلك الروح' }],
-      pricey: [{ t: 'Arb3in lira. El samak ghali hal sene.', ar: 'السمك غالي' }],
-      full: [{ t: 'Ma fi 3a2el ykoun shab3an w ja3an.', ar: 'شبعان' }] } },
-    jallab: { name: 'Hamoudi', voice: 4, hat: 'cap', shirt: 0xf2b733, hatCol: 0x0b3a4f, lines: {
-      greet: [{ t: 'Jallab b talj w snawbar!', ar: 'جلّاب بتلج' }],
-      idle: [{ t: 'Bel shob, jallab. Bel bard, kamén jallab.', ar: 'كمان جلّاب' },
-             { t: 'Ana 3am bkhabbi el talj men el shames.', ar: 'عم خبّي التلج' }],
-      sold: [{ t: 'Barid! Hayda ybarridak sa3a w nos.', ar: 'بيبرّدك' }],
-      pricey: [{ t: 'Sett lira bas. Ma 3andak sett lira?', ar: 'ست ليرات' }],
-      full: [{ t: 'Khalas, ma3dtak meliye.', ar: 'معدتك مليانة' }] } },
-    kaake: { name: 'Abou Khaled', voice: 1, hat: 'hard', shirt: 0xe4d7b3, hatCol: 0xb9502f, lines: {
-      greet: [{ t: 'Ka3ke! Ka3ke b za3tar!', ar: 'كعكة!' }],
-      idle: [{ t: 'Sar-li tlétin sene b2ool "ka3ke". Wala marra ghayyart.', ar: 'تلاتين سنة' },
-             { t: 'El ka3ke ma btekhla2 bala ba7er.', ar: 'بلا بحر' }],
-      sold: [{ t: 'Khod. W hay za3tar 3a jamb.', ar: 'زعتر ع جنب' }],
-      pricey: [{ t: 'Khams lira. Iza ma ma3ak, ballet.', ar: 'خمس ليرات' }],
-      full: [{ t: 'Khodha ma3ak la ba3dén. La2, mesh balash.', ar: 'مش ببلاش' }] } }
+      full: [{ t: 'Shab3an? Mnih. Rou7 shtghol.', ar: 'شبعان؟' }] } }
   };
+
   var PAY_PER_BALATA = 3;     // the more you tile, the more you make
   var PAY_PER_SURVIVING = 1;  // and the inspection pays rent on what holds
 
@@ -1447,11 +1430,21 @@
         var g = new THREE.Group();
         g.position.set(s.x, 0, s.z);
         g.rotation.y = s.ry || 0;
-        var legH = s.y - s.base + s.h * 0.5;
+        if (s.plinth) {
+          // a cast block on the mole: reads as "standing on something" from far off
+          var pl = new THREE.Mesh(new THREE.BoxGeometry(s.w * 0.9, s.base + 1.6, 2.6), postMat);
+          pl.position.set(0, (s.base - 1.6) / 2, -0.2);
+          g.add(pl);
+        }
+        var legH = s.y - s.base + s.h * 0.5, legW = s.w > 10 ? 0.6 : 0.42;
         for (var side = -1; side <= 1; side += 2) {
-          var leg = new THREE.Mesh(new THREE.BoxGeometry(0.28, legH, 0.28), postMat);
-          leg.position.set(side * s.w * 0.32, s.base + legH / 2, -0.22);
+          var leg = new THREE.Mesh(new THREE.BoxGeometry(legW, legH, legW), postMat);
+          leg.position.set(side * s.w * 0.32, s.base + legH / 2, -0.24);
           g.add(leg);
+          // a poured footing where the leg meets whatever it stands on
+          var foot = new THREE.Mesh(new THREE.BoxGeometry(legW * 2.4, 0.3, legW * 2.4), postMat);
+          foot.position.set(side * s.w * 0.32, s.base + 0.15, -0.24);
+          g.add(foot);
         }
         var frame = new THREE.Mesh(new THREE.BoxGeometry(s.w + 0.42, s.h + 0.42, 0.24), frameMat);
         frame.position.set(0, s.y + s.h / 2, -0.06);
@@ -1473,7 +1466,7 @@
         if (s.base <= DECK_Y + 0.01 && world.landColliders) {
           for (var sd = -1; sd <= 1; sd += 2) {
             var lx = s.x + Math.cos(s.ry || 0) * sd * s.w * 0.32, lz = s.z;
-            world.landColliders.push({ x1: lx - 0.25, z1: lz - 0.45, x2: lx + 0.25, z2: lz + 0.05, top: DECK_Y + legH + 2 });
+            world.landColliders.push({ x1: lx - 0.55, z1: lz - 0.8, x2: lx + 0.55, z2: lz + 0.3, top: DECK_Y + legH + 2 });
           }
         }
         boards.push({

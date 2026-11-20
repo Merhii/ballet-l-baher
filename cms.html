@@ -211,6 +211,11 @@
   'use strict';
   var A = window.BLB_ADS;
   var DRAFT_KEY = 'blb.ads.draft';
+  /* This page is not published with the game: it is opened from the repo on
+     the owner's machine. Off disk it reads what is live from Pages. */
+  var LIVE_ADS = 'https://merhii.github.io/ballet-l-baher/ads.json';
+  var REPO = 'Merhii/ballet-l-baher';
+  var OFF_DISK = location.protocol === 'file:';
   var PALETTE = ['#0B3A4F', '#16708C', '#3FA8B4', '#EDF6F3', '#E4D7B3', '#A08F6A', '#B9502F',
     '#8C4A2F', '#3F6B3A', '#F6C445', '#F2B733', '#0A1A33', '#9AA0A0', '#2E7FA8', '#C98A5E'];
   var ads = [], sel = 0, source = '';
@@ -416,7 +421,9 @@
   });
   $('btnPreview').addEventListener('click', function () {
     if (A.writePreview(A.normalize(ads))) {
-      toast('Preview set. Open the game in this browser — the billboards use this draft.');
+      toast(OFF_DISK
+        ? 'Preview set. Open docs/index.html from the repo folder in this browser to see it.'
+        : 'Preview set. Open the game in this browser — the billboards use this draft.');
     } else toast('This browser blocked local storage.');
   });
   $('btnClearPreview').addEventListener('click', function () {
@@ -427,9 +434,7 @@
   // -------------------------------------------------------------- GitHub
   var dlg = $('pub');
   function ghDefaults() {
-    var host = location.hostname, m = host.match(/^([^.]+)\.github\.io$/);
-    var repo = sessionStorage.getItem('blb.gh.repo') || localStorage.getItem('blb.gh.repo') ||
-      (m ? m[1] + '/' + (location.pathname.split('/')[1] || '') : '');
+    var repo = localStorage.getItem('blb.gh.repo') || REPO;
     $('ghRepo').value = repo;
     $('ghBranch').value = localStorage.getItem('blb.gh.branch') || 'main';
     $('ghPaths').value = localStorage.getItem('blb.gh.paths') || 'ads.json, docs/ads.json';
@@ -492,9 +497,9 @@
     var hadPreview = A.readPreview();
     if (hadPreview) A.clearPreview();
     A.load(function (list, src) {
-      ads = list; setSource(src); render();
+      ads = list; setSource(src === 'ads.json' && OFF_DISK ? 'live site' : src); render();
       if (hadPreview) A.writePreview(hadPreview);
-    });
+    }, OFF_DISK ? LIVE_ADS : 'ads.json');
   }
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { render(); });
 })();

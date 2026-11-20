@@ -1315,9 +1315,10 @@
           'cold water chills you, and swimming with no stamina left is drowning. Hit zero ' +
           'and you pass out — someone drags you to the hospital, and the hospital sends a bill.</p>' +
           '<h4>Eating</h4>' +
-          '<p>Two <b>food courts</b> on the corniche — Souk el Akel to the east, Sahet el Qal3a ' +
-          'by the castle — plus Knefe Jardali. Walk up to a counter and press ' + K('E') + '. ' +
-          'Cheap food is stamina, real food is health, and some of it keeps working for a while.</p>' +
+          '<p><b>Souk el Akel</b>, the food court east of the stairs: Helwayet el Samra (sweets ' +
+          'and bouza, which cools you down), Soubras (sandwiches that keep healing you) and ' +
+          'Falafel Akkawi. Knefe Jardali is west of the stairs. Walk up to a counter and press ' +
+          K('E') + '. Sahet el Qal3a by the castle opens soon.</p>' +
           '<h4>Controls</h4><div class="keys">' +
           '<div>' + K('WASD') + ' walk</div><div>' + K('SHIFT') + ' run</div>' +
           '<div>' + K('SPACE') + ' jump</div><div>' + K('CLICK') + ' lay a balata</div>' +

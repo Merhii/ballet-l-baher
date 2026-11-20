@@ -29,25 +29,29 @@ sea takes: waves breaking over the frontier tile you are standing on, cold
 water, swimming with no stamina left, a long fall, working on an empty stomach.
 At zero you pass out, wake on the corniche, and the hospital sends a bill.
 
-You eat at two **food courts** — Souk el Akel to the east (manakish, shawarma,
-falafel) and Sahet el Qal3a by the castle (sayyadiyeh, jallab, ka3ke) — or at
-Knefe Jardali. Walk to a counter and press `E`. Shawarma keeps healing you for a
-minute; jallab halves your stamina drain for ninety seconds.
+You eat at **Souk el Akel**, the food court east of the stairs — Helwayet el
+Samra (sweets and bouza, which halves your stamina drain for ninety seconds),
+Soubras (sandwiches that keep healing you for a minute) and Falafel Akkawi — or
+at Knefe Jardali. Walk to a counter and press `E`. Sahet el Qal3a, the court by
+the castle, is shuttered until it opens.
 
 ## Billboards and the CMS
 
 Five billboards stand in the world: two hoardings behind the promenade, one on
-each food-court roof, and one out on the harbour mole. They rotate through the
-ads in `ads.json` (text and colour, painted on a canvas at runtime — still no
-asset files).
+each food-court roof, and one on a plinth out on the harbour mole. They rotate
+through the ads in `ads.json` (text and colour, painted on a canvas at runtime —
+still no asset files). A board with nothing booked advertises itself: "ad space
+coming soon, inquire in Credits".
 
-`cms.html` (served at `/cms.html` next to the game) edits them: sponsor,
-Arabic name, headline, layout, colours, which billboard locations each ad runs
-on, weight, start and end dates. **Preview in game** pushes the draft into this
-browser only; **Publish** commits `ads.json` and `docs/ads.json` to the repo
-through the GitHub API with a fine-grained token, and Pages redeploys. Or
-download `ads.json` and commit it yourself. Impressions are counted per browser
-only — there is no server.
+`cms.html` edits them: sponsor, Arabic name, headline, layout, colours, which
+board each ad runs on, weight, start and end dates. It is **not** published with
+the game — open it straight from the repo folder on your own machine. It reads
+what is live from the site; **Publish** commits `ads.json` and `docs/ads.json`
+through the GitHub API with your fine-grained token (kept in that tab only), and
+Pages redeploys. Without the token nobody can change the billboards, even with a
+copy of the page. **Preview in game** shows a draft in this browser only — open
+`docs/index.html` from the repo folder to see it. Impressions are counted per
+browser only — there is no server.
 
 ## Controls
 

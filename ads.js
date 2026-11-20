@@ -19,7 +19,7 @@
   var PLACEMENTS = ['corniche-w', 'corniche-e', 'souk', 'qalaa', 'harbour'];
   var PLACEMENT_NAMES = {
     'corniche-w': 'Corniche west hoarding (by the stairs)',
-    'corniche-e': 'Corniche east hoarding (by Souk el Akel)',
+    'corniche-e': 'Corniche east hoarding (behind the kiosk)',
     souk: 'Souk el Akel roof (east food court)',
     qalaa: 'Sahet el Qal3a roof (west food court)',
     harbour: 'Harbour mole (seen from the water)'
@@ -289,7 +289,9 @@
     if (prev) { cb(prev, 'preview'); return; }
     var done = false;
     function fallback() { if (!done) { done = true; cb(normalize(DEFAULTS), 'defaults'); } }
-    if (typeof fetch !== 'function' || (root.location && root.location.protocol === 'file:')) {
+    // off disk, a relative ads.json cannot be fetched; an absolute URL can
+    var offDisk = root.location && root.location.protocol === 'file:';
+    if (typeof fetch !== 'function' || (offDisk && !/^https?:\/\//.test(url || ''))) {
       fallback(); return;
     }
     try {
