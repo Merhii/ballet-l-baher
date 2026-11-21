@@ -628,7 +628,8 @@
 
   /* =========================================================================
      THE CORNICHE — deck y=1.5, x[-130,130], z[-34,-2]; sea wall at z=-2;
-     public stair flight down to the water at x[-5,5]; riprap at its foot.
+     public stair flight down to the water at x[-5,5], a second one in front
+     of Souk el Akel at SOUK_STAIR_X ± 5; riprap at the foot of the wall.
      ========================================================================= */
   const STAIR = [                       // top, zFrom, zTo   (lead's geometry)
     { top: 1.26, z1: -2.00, z2: -1.08 },
@@ -637,6 +638,8 @@
     { top: 0.54, z1: 0.76, z2: 1.68 },
     { top: 0.30, z1: 1.68, z2: 2.60 }
   ];
+  // the second flight, centred on the old railing gap in front of the food court
+  const SOUK_STAIR_X = 42.4;
 
   function buildCorniche() {
     const C0 = W.COL, rng = mulberry(7001);
@@ -679,66 +682,79 @@
     coll(-131.6, -34, -130, -2, 3.0);
     coll(130, -34, 131.6, -2, 3.0);
 
-    /* ---- the stairs down to the water ---- */
-    for (let s = 0; s < STAIR.length; s++) {
-      const st = STAIR[s], h = st.top + 1.4, cy = st.top - h * 0.5;
-      const wet = s >= 3 ? 1 : (s === 2 ? 0.35 : 0);
-      // tread + riser as one solid block, so the flight reads as cut stone
-      vary(limestone, rng, 0.06, c);
-      if (wet > 0) mixc(c, C0.STONE_WET, wet * 0.55, c);
-      mPave.box(c, 0, cy, (st.z1 + st.z2) * 0.5, 10, h, st.z2 - st.z1, 0, 0, 0, 1 / 8);
-      // worn bright nosing on the step edge
-      mPave.box(shade(limestone, 0.07, c), 0, st.top - 0.015, st.z2 - 0.07, 9.9, 0.04, 0.16, 0, 0, 0, 1 / 8);
-      // black waterline staining + green algae on the lowest two
-      if (s >= 3) {
-        mFlat.box(mixc(C0.STONE_WET, C0.NIGHT_TOP, 0.5, c), 0, st.top + 0.003, (st.z1 + st.z2) * 0.5,
-          9.8, 0.01, (st.z2 - st.z1) * 0.9);
-        for (let k = 0; k < 7; k++) {
-          mFlat.box(mixc(C0.PALM_GREEN, C0.SEA_DEEP, 0.3, c),
-            -4.4 + rng() * 8.8, st.top + 0.008, st.z1 + 0.2 + rng() * (st.z2 - st.z1 - 0.4),
-            0.5 + rng() * 1.1, 0.012, 0.3 + rng() * 0.5, 0, (rng() - 0.5) * 0.6, 0);
-        }
-      }
-      coll(-5, st.z1, 5, st.z2, st.top);
-    }
-    // poured concrete apron at the bottom — exactly tile height, first balata here
-    mPave.box(mixc(cement, limestone, 0.35, c), 0, 0.3 - 0.75, 2.25, 10, 1.5, 1.3, 0, 0, 0, 1 / 8);
-    mFlat.box(mixc(C0.STONE_WET, C0.PALM_GREEN, 0.28, c), 0, 0.306, 2.45, 9.6, 0.012, 0.8);
-    coll(-5, 1.6, 5, 2.9, 0.30);
-
-    // stair cheek walls (outside the walkable corridor) + rusted iron handrail
-    for (let side = -1; side <= 1; side += 2) {
-      const x = side * 5.35;
+    /* ---- the stairs down to the water ----
+       Two flights, the same cut: the public one at x = 0 under the stair head,
+       and a second one in front of Souk el Akel (SOUK_STAIR_X), so you can eat
+       and go straight back down to your pier. `r` is the flight's own random
+       stream, so adding a flight never reshuffles the rest of the corniche. */
+    function stairFlight(cx, r) {
       for (let s = 0; s < STAIR.length; s++) {
-        const st = STAIR[s];
-        mMas.box(shade(limestone, -0.05, c), x, (st.top + 0.26) * 0.5 - 0.2, (st.z1 + st.z2) * 0.5,
-          0.7, st.top + 1.6, st.z2 - st.z1, 0, 0, 0, 1 / 6);
-        // collide with the stone you can see: each cheek block's top is
-        // st.top + 0.73. (One flat 1.5 m box used to leave an invisible shelf
-        // above the lower blocks and a walkable beam out over the water.)
-        coll(side * 5.0, st.z1, side * 5.7, st.z2, st.top + 0.73);
+        const st = STAIR[s], h = st.top + 1.4, cy = st.top - h * 0.5;
+        const wet = s >= 3 ? 1 : (s === 2 ? 0.35 : 0);
+        // tread + riser as one solid block, so the flight reads as cut stone
+        vary(limestone, r, 0.06, c);
+        if (wet > 0) mixc(c, C0.STONE_WET, wet * 0.55, c);
+        mPave.box(c, cx, cy, (st.z1 + st.z2) * 0.5, 10, h, st.z2 - st.z1, 0, 0, 0, 1 / 8);
+        // worn bright nosing on the step edge
+        mPave.box(shade(limestone, 0.07, c), cx, st.top - 0.015, st.z2 - 0.07, 9.9, 0.04, 0.16, 0, 0, 0, 1 / 8);
+        // black waterline staining + green algae on the lowest two
+        if (s >= 3) {
+          mFlat.box(mixc(C0.STONE_WET, C0.NIGHT_TOP, 0.5, c), cx, st.top + 0.003, (st.z1 + st.z2) * 0.5,
+            9.8, 0.01, (st.z2 - st.z1) * 0.9);
+          for (let k = 0; k < 7; k++) {
+            mFlat.box(mixc(C0.PALM_GREEN, C0.SEA_DEEP, 0.3, c),
+              cx - 4.4 + r() * 8.8, st.top + 0.008, st.z1 + 0.2 + r() * (st.z2 - st.z1 - 0.4),
+              0.5 + r() * 1.1, 0.012, 0.3 + r() * 0.5, 0, (r() - 0.5) * 0.6, 0);
+          }
+        }
+        coll(cx - 5, st.z1, cx + 5, st.z2, st.top);
       }
-      // the last stretch beside the apron, down to the water
-      coll(side * 5.0, STAIR[STAIR.length - 1].z2, side * 5.7, 2.9, STAIR[STAIR.length - 1].top + 0.73);
+      // poured concrete apron at the bottom — exactly tile height, first balata here
+      mPave.box(mixc(cement, limestone, 0.35, c), cx, 0.3 - 0.75, 2.25, 10, 1.5, 1.3, 0, 0, 0, 1 / 8);
+      mFlat.box(mixc(C0.STONE_WET, C0.PALM_GREEN, 0.28, c), cx, 0.306, 2.45, 9.6, 0.012, 0.8);
+      coll(cx - 5, 1.6, cx + 5, 2.9, 0.30);
+
+      // stair cheek walls (outside the walkable corridor) + rusted iron handrail
+      for (let side = -1; side <= 1; side += 2) {
+        const x = cx + side * 5.35;
+        for (let s = 0; s < STAIR.length; s++) {
+          const st = STAIR[s];
+          mMas.box(shade(limestone, -0.05, c), x, (st.top + 0.26) * 0.5 - 0.2, (st.z1 + st.z2) * 0.5,
+            0.7, st.top + 1.6, st.z2 - st.z1, 0, 0, 0, 1 / 6);
+          // collide with the stone you can see: each cheek block's top is
+          // st.top + 0.73. (One flat 1.5 m box used to leave an invisible shelf
+          // above the lower blocks and a walkable beam out over the water.)
+          coll(cx + side * 5.0, st.z1, cx + side * 5.7, st.z2, st.top + 0.73);
+        }
+        // the last stretch beside the apron, down to the water
+        coll(cx + side * 5.0, STAIR[STAIR.length - 1].z2, cx + side * 5.7, 2.9, STAIR[STAIR.length - 1].top + 0.73);
+      }
+      // handrail: posts on the right-hand cheek, rail following the flight
+      const hx = cx + 5.05, rust = C0.RUST;
+      let prev = null;
+      for (let s = 0; s <= STAIR.length; s++) {
+        const z = s < STAIR.length ? STAIR[s].z1 : STAIR[STAIR.length - 1].z2;
+        const top = s < STAIR.length ? STAIR[s].top : STAIR[STAIR.length - 1].top;
+        const ry = top + 0.95;
+        mFlat.rod(vary(rust, r, 0.2, c), hx, top, z + 0.1, hx, ry, z + 0.1, 0.06, PRIM.cyl6);
+        if (prev) mFlat.rod(mixc(rust, C0.CEMENT, 0.25, c), prev.x, prev.y, prev.z, hx, ry, z + 0.1, 0.055, PRIM.cyl6);
+        prev = { x: hx, y: ry, z: z + 0.1 };
+      }
     }
-    // handrail: posts on the right-hand cheek, rail following the flight
-    const hx = 5.05, rust = C0.RUST;
-    let prev = null;
-    for (let s = 0; s <= STAIR.length; s++) {
-      const z = s < STAIR.length ? STAIR[s].z1 : STAIR[STAIR.length - 1].z2;
-      const top = s < STAIR.length ? STAIR[s].top : STAIR[STAIR.length - 1].top;
-      const ry = top + 0.95;
-      mFlat.rod(vary(rust, rng, 0.2, c), hx, top, z + 0.1, hx, ry, z + 0.1, 0.06, PRIM.cyl6);
-      if (prev) mFlat.rod(mixc(rust, C0.CEMENT, 0.25, c), prev.x, prev.y, prev.z, hx, ry, z + 0.1, 0.055, PRIM.cyl6);
-      prev = { x: hx, y: ry, z: z + 0.1 };
-    }
-    // mooring ring + a coil of blue rope on the apron
+    stairFlight(0, rng);
+    const rust = C0.RUST;
+    // mooring ring + a coil of blue rope on the main apron
     mFlat.prim(PRIM.torus, mixc(rust, C0.NIGHT_TOP, 0.3, c), -3.6, 0.42, 2.0, 0.6, 0.6, 0.6, 0, 0, Math.PI * 0.5);
     mFlat.box(shade(rust, -0.18, c), -3.6, 0.36, 2.0, 0.28, 0.24, 0.3);
     for (let k = 0; k < 4; k++) {
       mFlat.prim(PRIM.torus, vary(C0.DENIM, rng, 0.25, c), 3.1, 0.33 + k * 0.055, 2.1,
         1.5 - k * 0.18, 1.5 - k * 0.18, 1.5 - k * 0.18, Math.PI * 0.5, rng() * 3, 0);
     }
+    // the second flight, by the food court, with a mooring ring of its own
+    const r2 = mulberry(7002);
+    stairFlight(SOUK_STAIR_X, r2);
+    mFlat.prim(PRIM.torus, mixc(rust, C0.NIGHT_TOP, 0.3, c), SOUK_STAIR_X + 3.6, 0.42, 2.0, 0.6, 0.6, 0.6, 0, 0, Math.PI * 0.5);
+    mFlat.box(shade(rust, -0.18, c), SOUK_STAIR_X + 3.6, 0.36, 2.0, 0.28, 0.24, 0.3);
 
     /* ---- riprap rubble at the foot of the sea wall (z < 3, outside the stairs) */
     const mRock = new Mesher();
@@ -751,8 +767,11 @@
       const s = 0.8 + rng() * 1.8;
       const y = -1.6 + rng() * 1.9;
       vary(y < 0.1 ? C0.STONE_WET : C0.STONE_DARK, rng, 0.17, c);
-      mRock.box(c, x, y, z, s, s * (0.6 + rng() * 0.5), s * (0.8 + rng() * 0.5),
-        (rng() - 0.5) * 0.5, rng() * TAU, (rng() - 0.5) * 0.5, 1 / 10);
+      const sy = s * (0.6 + rng() * 0.5), sz = s * (0.8 + rng() * 0.5);
+      const rx = (rng() - 0.5) * 0.5, ryy = rng() * TAU, rz = (rng() - 0.5) * 0.5;
+      // the souk stairs: drawn but not placed, so every other rock stays put
+      if (Math.abs(x - SOUK_STAIR_X) < 7.2) continue;
+      mRock.box(c, x, y, z, s, sy, sz, rx, ryy, rz, 1 / 10);
     }
 
     /* ---- the inland cliff: stratified limestone holding up the city --------- */
@@ -788,7 +807,8 @@
     const C0 = W.COL, rng = mulberry(8123), c = new T.Color();
     const RZ = -2.72;
     // gaps: the stair head, plus four stretches where the rail never came back
-    const gaps = [[-6.2, 6.2], [-27, -21.4], [39.2, 45.6], [-73.5, -67.2], [88, 93.6], [112, 115.4]];
+    const gaps = [[-6.2, 6.2], [-27, -21.4], [SOUK_STAIR_X - 6.2, SOUK_STAIR_X + 6.2],
+      [-73.5, -67.2], [88, 93.6], [112, 115.4]];
     const inGap = function (x) {
       for (let i = 0; i < gaps.length; i++) if (x > gaps[i][0] && x < gaps[i][1]) return true;
       return false;
@@ -1379,7 +1399,7 @@
     const m = new Mesher();
 
     /* ---- lamp posts ---- */
-    const lampXs = [-120, -96, -78, -52, -36, -14, 12, 28, 46, 70, 94, 112];
+    const lampXs = [-120, -96, -78, -52, -36, -14, 12, 28, 49.5, 70, 94, 112];
     const headXf = [];
     for (let i = 0; i < lampXs.length; i++) {
       const x = lampXs[i], z = -5.0 + (rng() - 0.5) * 0.3, lean = (rng() - 0.5) * 0.03;
@@ -1901,6 +1921,7 @@
     const gapChairs = [[-24.6, -2.9], [42.3, -3.0], [-70.4, -2.85], [90.5, -3.05], [113.6, -2.95]];
     for (let i = 0; i < gapChairs.length; i++) {
       if (i === 0) continue;                       // that gap is the uncle's spot
+      if (i === 1) continue;                       // that gap is the souk stairs now
       chairMesher(m, PLASTIC[i % PLASTIC.length], gapChairs[i][0], 1.5, gapChairs[i][1],
         Math.PI + (rng() - 0.5) * 0.7, 0);
       coll(gapChairs[i][0] - 0.3, gapChairs[i][1] - 0.3, gapChairs[i][0] + 0.3, gapChairs[i][1] + 0.3, 1.95);
@@ -2916,7 +2937,9 @@
       cart: W.cart,                               // the manakish/coffee cart
       foodCourts: courts.map(function (c) { return c.court; }),   // stalls the game sells from
       adSlots: adSlotList(),                      // where the billboards stand
-      stairs: STAIR.map(function (s) { return { top: s.top, z1: s.z1, z2: s.z2, x1: -5, x2: 5 }; }),
+      stairs: [0, SOUK_STAIR_X].reduce(function (all, cx) {
+        return all.concat(STAIR.map(function (s) { return { top: s.top, z1: s.z1, z2: s.z2, x1: cx - 5, x2: cx + 5 }; }));
+      }, []),
       setLightsEnabled: function (on) { lights.visible = !!on; }
     };
     setTimeOfDay(0.18);
