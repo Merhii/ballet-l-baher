@@ -1,0 +1,61 @@
+# Runs on every push and pull request: the game scripts parse, the billboard
+# list is valid, the smoke tests pass, and docs/ (what GitHub Pages serves) is
+# exactly what the build produces from the source.
+name: Checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Scripts parse
+        run: |
+          for f in ads.js physics.js world.js hud.js game.js test/smoke.js; do
+            node --check "$f"
+          done
+
+      - name: Billboard list is valid
+        run: |
+          node -e '
+            const fs = require("fs");
+            const j = JSON.parse(fs.readFileSync("ads.json", "utf8"));
+            if (!Array.isArray(j.ads)) throw new Error("ads.json: no ads array");
+            for (const a of j.ads) {
+              if (!a.id || !a.sponsor) throw new Error("ads.json: an ad is missing id or sponsor");
+              if (a.url && !/^https:\/\//.test(a.url)) throw new Error("ads.json: " + a.id + " link must be https");
+            }
+            console.log(j.ads.length + " ad(s) ok");
+          '
+
+      - name: Smoke tests
+        run: node test/smoke.js
+
+      - name: Build
+        run: sh build.sh
+
+      - name: docs/ matches the source
+        run: |
+          if ! git diff --ignore-cr-at-eol --quiet -- docs || [ -n "$(git status --porcelain -- docs)" ]; then
+            git status --short -- docs
+            git diff --ignore-cr-at-eol --stat -- docs
+            echo "::error::docs/ is out of date. Run ./build.sh (or .\build.ps1 on Windows) and commit docs/."
+            exit 1
+          fi
