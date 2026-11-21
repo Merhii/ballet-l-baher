@@ -8404,11 +8404,22 @@
     }
     window.addEventListener('keydown', function (e) { onKey(e, true); });
     window.addEventListener('keyup', function (e) { onKey(e, false); });
-    window.addEventListener('blur', function () { keys = {}; placing = false; orbiting = false; });
+    window.addEventListener('blur', function () {
+      keys = {}; placing = false; orbiting = false; orbitId = -1; placeId = -1;
+      touch.moveId = -1; touch.moveX = touch.moveZ = 0;
+    });
 
     canvas.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+    /* Several fingers at once on a phone: one on the stick, one looking, one
+       on a button. Each pointer event carries its finger's id, so the look
+       drag follows only the finger that started it (orbitId), and the stick
+       and the buttons, which handle their own fingers, never move the view
+       or end the drag. */
+    var orbitId = -1, placeId = -1;
     canvas.addEventListener('pointerdown', function (e) {
       sfx.unlock();
+      // a second finger on the scene while one is already looking: ignore it
+      if (orbitId !== -1 && e.pointerType !== 'mouse') return;
       // reset the gesture BEFORE anything that can throw, or a failed capture
       // leaves `dragging` set and silently eats the next click
       fp.dragX = 0; fp.dragY = 0; fp.dragging = false;
@@ -8416,14 +8427,13 @@
         if (canvas.setPointerCapture) canvas.setPointerCapture(e.pointerId);
       } catch (err) { /* stale or synthetic pointer id — not fatal */ }
       if (e.button === 2 || e.button === 1) {
-        orbiting = true; lastPX = e.clientX; lastPY = e.clientY;
+        orbiting = true; orbitId = e.pointerId; lastPX = e.clientX; lastPY = e.clientY;
         return;
       }
       if (firstPerson && !fp.locked && e.pointerType !== 'mouse') {
         // touch: a finger on the scene drags the view; a tap still lays
         requestLook();
-        orbiting = true; lastPX = e.clientX; lastPY = e.clientY;
-        placing = false;
+        orbiting = true; orbitId = e.pointerId; lastPX = e.clientX; lastPY = e.clientY;
         return;
       }
       if (firstPerson && !fp.locked) {
@@ -8432,19 +8442,33 @@
            which only removes the cursor and the screen-edge limit. */
         requestLook();
       }
-      placing = true;
+      placing = true; placeId = e.pointerId;
+      // third person on a touch screen aims where the finger is
+      mouseNDC.x = (e.clientX / window.innerWidth) * 2 - 1;
+      mouseNDC.y = -(e.clientY / window.innerHeight) * 2 + 1;
       tryPlace(true);
     });
-    window.addEventListener('pointerup', function (e) {
-      if (e.button === 2 || e.button === 1) { orbiting = false; return; }
-      if (firstPerson && !fp.locked && e.pointerType !== 'mouse') {
+    function pointerEnd(e) {
+      if (placeId !== -1 && e.pointerId === placeId) { placeId = -1; placing = false; }
+      if (orbitId !== -1 && e.pointerId === orbitId) {
+        // the looking finger (or the right/middle mouse button) let go
+        orbitId = -1;
         orbiting = false;
-        // a click that did not travel still lays a balata
-        if (!fp.dragging) tryPlace(true);
+        if (e.pointerType === 'mouse') placing = false;
+        // a touch that did not travel still lays a balata
+        if (e.type === 'pointerup' && e.pointerType !== 'mouse' && firstPerson && !fp.locked &&
+            !fp.dragging) tryPlace(true);
+        return;
       }
+      // any other finger (the stick, a button) is not ours to end
+      if (e.pointerType !== 'mouse') return;
       placing = false;
-    });
+    }
+    window.addEventListener('pointerup', pointerEnd);
+    window.addEventListener('pointercancel', pointerEnd);
     window.addEventListener('pointermove', function (e) {
+      // only the mouse, or the looking finger, aims; the stick finger must not
+      if (e.pointerType !== 'mouse' && e.pointerId !== orbitId && e.pointerId !== placeId) return;
       mouseNDC.x = (e.clientX / window.innerWidth) * 2 - 1;
       mouseNDC.y = -(e.clientY / window.innerHeight) * 2 + 1;
       if (fp.locked) {
@@ -8539,10 +8563,13 @@
       document.body.appendChild(wrap);
       var stick = wrap.querySelector('#tstick'), nub = wrap.querySelector('#tnub');
       stick.addEventListener('pointerdown', function (e) {
+        if (touch.moveId !== -1 && touch.moveId !== undefined) return;   // already held by a finger
+        e.preventDefault();
         touch.moveId = e.pointerId; var r = stick.getBoundingClientRect();
         touch.ox = r.left + r.width / 2; touch.oy = r.top + r.height / 2;
         touch.rad = r.width * 0.35; touch.trav = r.width * 0.26;
-        stick.setPointerCapture(e.pointerId); sfx.unlock();
+        try { stick.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+        sfx.unlock();
       });
       stick.addEventListener('pointermove', function (e) {
         if (e.pointerId !== touch.moveId) return;
@@ -8558,6 +8585,7 @@
       }
       stick.addEventListener('pointerup', endStick);
       stick.addEventListener('pointercancel', endStick);
+      stick.addEventListener('lostpointercapture', endStick);
       /* Looking is handled by the canvas pointer events, which already cover
          touch. The old touchmove listener here doubled every drag. */
       tTalk = wrap.querySelector('#ttalk');
@@ -8565,14 +8593,31 @@
         e.preventDefault();
         interact();
       });
-      var lay = wrap.querySelector('#tlay'), dig = wrap.querySelector('#tdig');
-      lay.addEventListener('pointerdown', function () { sfx.unlock(); placing = true; });
-      lay.addEventListener('pointerup', function () { placing = false; });
-      dig.addEventListener('pointerdown', function () { keys.KeyE = true; });
-      dig.addEventListener('pointerup', function () { keys.KeyE = false; });
-      var jmp = wrap.querySelector('#tjump');
-      jmp.addEventListener('pointerdown', function () { keys.Space = true; });
-      jmp.addEventListener('pointerup', function () { keys.Space = false; });
+      /* A held button keeps its own finger (pointer capture), so it lets go
+         when THAT finger lifts, even if it slid off the button, and never
+         because another finger did. */
+      function holdButton(btn, down, up) {
+        var id = -1;
+        btn.addEventListener('pointerdown', function (e) {
+          e.preventDefault();
+          id = e.pointerId;
+          try { btn.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+          sfx.unlock();
+          down();
+        });
+        var end = function (e) {
+          if (e.pointerId !== id) return;
+          id = -1;
+          up();
+        };
+        btn.addEventListener('pointerup', end);
+        btn.addEventListener('pointercancel', end);
+        btn.addEventListener('lostpointercapture', end);
+        btn.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+      }
+      holdButton(wrap.querySelector('#tlay'), function () { placing = true; }, function () { placing = false; });
+      holdButton(wrap.querySelector('#tdig'), function () { keys.KeyE = true; }, function () { keys.KeyE = false; });
+      holdButton(wrap.querySelector('#tjump'), function () { keys.Space = true; }, function () { keys.Space = false; });
     }
 
     // ------------------------------------------------------------- economy
@@ -9456,7 +9501,7 @@
     function pause() {
       if (!S.started || paused) return;
       paused = true;
-      keys = {}; placing = false; orbiting = false;
+      keys = {}; placing = false; orbiting = false; orbitId = -1; placeId = -1;
       save();
       releaseLook();
       hud.setPrompt(null);
