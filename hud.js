@@ -1527,6 +1527,11 @@
             seg('view', [['first', 'First'], ['third', 'Third']], st.view || 'first') + '</div>' +
           '<div class="blb-set"><div class="k">Head bob<small>walking sway in first person</small></div>' +
             seg('bob', [['on', 'On'], ['off', 'Off']], st.bob === false ? 'off' : 'on') + '</div>' +
+          // only on a device unlocked with the owner's debug code
+          (st.devUnlocked
+            ? '<div class="blb-set"><div class="k">Debug overlay<small>FPS, device and errors on screen</small></div>' +
+              seg('debug', [['on', 'On'], ['off', 'Off']], st.debug ? 'on' : 'off') + '</div>'
+            : '') +
           '</div>' + back;
       } else if (name === 'credits') {
         html += '<h3>Credits <span class="ar">مين</span></h3><div class="bd">' +
@@ -2091,6 +2096,11 @@
       showMenu: showMenu,
       hideMenu: hideIntro,
       isMenuOpen: function () { return introOpen; },
+      // new settings while the menu is up (the debug switch appearing): redraw an open sheet
+      refreshSettings: function (o) {
+        menuState.settings = Object.assign({}, menuState.settings, o || {});
+        if (sheetName === 'settings') openSheet('settings');
+      },
       menuMode: function () { return introOpen ? menuState.mode : null; },
       closeSheet: function () { if (sheetName) { openSheet(''); focusFirst(); return true; } return false; },
       setBuffs: setBuffs,

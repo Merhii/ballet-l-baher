@@ -6451,6 +6451,11 @@
             seg('view', [['first', 'First'], ['third', 'Third']], st.view || 'first') + '</div>' +
           '<div class="blb-set"><div class="k">Head bob<small>walking sway in first person</small></div>' +
             seg('bob', [['on', 'On'], ['off', 'Off']], st.bob === false ? 'off' : 'on') + '</div>' +
+          // only on a device unlocked with the owner's debug code
+          (st.devUnlocked
+            ? '<div class="blb-set"><div class="k">Debug overlay<small>FPS, device and errors on screen</small></div>' +
+              seg('debug', [['on', 'On'], ['off', 'Off']], st.debug ? 'on' : 'off') + '</div>'
+            : '') +
           '</div>' + back;
       } else if (name === 'credits') {
         html += '<h3>Credits <span class="ar">مين</span></h3><div class="bd">' +
@@ -7015,6 +7020,11 @@
       showMenu: showMenu,
       hideMenu: hideIntro,
       isMenuOpen: function () { return introOpen; },
+      // new settings while the menu is up (the debug switch appearing): redraw an open sheet
+      refreshSettings: function (o) {
+        menuState.settings = Object.assign({}, menuState.settings, o || {});
+        if (sheetName === 'settings') openSheet('settings');
+      },
       menuMode: function () { return introOpen ? menuState.mode : null; },
       closeSheet: function () { if (sheetName) { openSheet(''); focusFirst(); return true; } return false; },
       setBuffs: setBuffs,
@@ -7954,7 +7964,7 @@
     scene.add(fx.object);
 
     // ---- settings, kept per browser
-    var SET = { sound: true, sens: 1, fov: 58, view: 'first', bob: true };
+    var SET = { sound: true, sens: 1, fov: 58, view: 'first', bob: true, debug: false };
     try {
       var rawSet = JSON.parse(localStorage.getItem('blb.settings') || 'null');
       if (rawSet) {
@@ -7997,6 +8007,178 @@
       nextInspection: INSPECTION_EVERY, nextHeckle: 24, squall: false, phase: '',
       wasInWater: false
     };
+
+    /* ------------------------------------------------------- debug overlay
+       For testing on real phones: frame rate, the device, the GPU and any
+       error, on screen, so a screenshot says what went wrong. It is the
+       owner's tool: it unlocks on a device only with the secret code, as
+       ?debug=<code> in the link. The code is not in this file, only its
+       SHA-256, which cannot be turned back into it. Once unlocked, the
+       device remembers, and Settings shows a Debug overlay switch.
+       ?debug=lock forgets it again. */
+    var DEV_HASH = '31d169eea2d9214f2427e440ed4381dfb50f483dfd548dc4eca379c040ea04d8';
+    var DEV_KEY = 'blb.dev';
+    var dev = { unlocked: false, on: false, el: null, errors: [], frames: [], acc: 0, gpu: '' };
+    try { dev.unlocked = localStorage.getItem(DEV_KEY) === DEV_HASH; } catch (e) { /* ignore */ }
+    if (!dev.unlocked) SET.debug = false;
+    function sha256Hex(text) {
+      if (!(window.crypto && crypto.subtle && window.TextEncoder)) return Promise.reject(new Error('no crypto'));
+      return crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)).then(function (buf) {
+        var b = new Uint8Array(buf), s = '';
+        for (var i = 0; i < b.length; i++) s += ('0' + b[i].toString(16)).slice(-2);
+        return s;
+      });
+    }
+    (function checkDevLink() {
+      var q;
+      try { q = new URLSearchParams(location.search).get('debug'); } catch (e) { return; }
+      if (q === null) return;
+      // take the code out of the address bar at once, so it never shows in a screenshot
+      try {
+        var u = new URL(location.href);
+        u.searchParams.delete('debug');
+        history.replaceState(null, '', u.pathname + (u.search || '') + u.hash);
+      } catch (e) { /* ignore */ }
+      if (q === 'lock') {
+        dev.unlocked = false; SET.debug = false; saveSettings();
+        try { localStorage.removeItem(DEV_KEY); } catch (e) { /* ignore */ }
+        setDev(false);
+        return;
+      }
+      sha256Hex(q).then(function (h) {
+        if (h !== DEV_HASH) return;          // a wrong code just does nothing
+        dev.unlocked = true;
+        try { localStorage.setItem(DEV_KEY, DEV_HASH); } catch (e) { /* ignore */ }
+        SET.debug = true; saveSettings();
+        setDev(true);
+        if (hud.isMenuOpen && hud.isMenuOpen() && hud.refreshSettings) hud.refreshSettings(menuSettings());
+      }, function () { /* no crypto (file://): nothing to do */ });
+    })();
+    if (SET.debug && dev.unlocked) setDev(true);
+    function menuSettings() {
+      var o = {};
+      for (var k in SET) if (SET.hasOwnProperty(k)) o[k] = SET[k];
+      o.devUnlocked = dev.unlocked;
+      return o;
+    }
+    function devLog(kind, msg) {
+      var line = kind + ': ' + String(msg || '').slice(0, 220);
+      if (dev.errors.length && dev.errors[dev.errors.length - 1].line === line) {
+        dev.errors[dev.errors.length - 1].n++;
+        return;
+      }
+      dev.errors.push({ line: line, n: 1, t: Math.round(S.elapsed) });
+      if (dev.errors.length > 6) dev.errors.shift();
+    }
+    // errors are caught from the start, so turning the overlay on shows what already happened
+    window.addEventListener('error', function (e) {
+      devLog('error', (e && e.message ? e.message : 'unknown') +
+        (e && e.filename ? ' @' + String(e.lineno || '') : ''));
+    });
+    window.addEventListener('unhandledrejection', function (e) {
+      devLog('promise', e && e.reason ? (e.reason.message || e.reason) : 'rejected');
+    });
+    function devGpu() {
+      if (dev.gpu) return dev.gpu;
+      try {
+        var gl = renderer.getContext();
+        var ext = gl.getExtension('WEBGL_debug_renderer_info');
+        dev.gpu = ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
+      } catch (e) { dev.gpu = 'unknown'; }
+      return dev.gpu;
+    }
+    function setDev(on) {
+      dev.on = !!(on && dev.unlocked);
+      if (dev.on && !dev.el) {
+        var el = document.createElement('div');
+        el.setAttribute('aria-hidden', 'true');
+        el.style.cssText = 'position:fixed;left:50%;top:max(6px,env(safe-area-inset-top));' +
+          'transform:translateX(-50%);z-index:95;max-width:min(560px,calc(100vw - 16px));' +
+          'background:rgba(6,20,28,.86);color:#d8f3e8;border:1px solid rgba(242,183,51,.7);' +
+          'border-radius:6px;padding:5px 8px;font:11px/1.35 ui-monospace,Menlo,Consolas,monospace;' +
+          'white-space:pre-wrap;word-break:break-word;pointer-events:auto;cursor:pointer;';
+        // small screens start as one line; a tap opens the full report
+        dev.full = window.innerHeight > 500 && window.innerWidth > 700;
+        el.addEventListener('click', function (e) {
+          if (e.target.closest && e.target.closest('[data-copy]')) return;
+          e.stopPropagation();
+          dev.full = !dev.full;
+          paintDev();
+        });
+        el.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+        el.addEventListener('touchstart', function (e) { e.stopPropagation(); }, { passive: true });
+        el.innerHTML = '<div data-d></div><button type="button" data-copy style="pointer-events:auto;' +
+          'margin-top:4px;font:inherit;background:#f2b733;color:#0b3a4f;border:0;border-radius:4px;' +
+          'padding:2px 8px;">Copy report</button>';
+        el.querySelector('[data-copy]').addEventListener('click', function (e) {
+          e.stopPropagation();
+          var txt = devReport();
+          var b = e.currentTarget;
+          var ok = function () { b.textContent = 'Copied'; setTimeout(function () { b.textContent = 'Copy report'; }, 1500); };
+          if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(ok, function () { b.textContent = 'Copy failed'; });
+        });
+        document.body.appendChild(el);
+        dev.el = el;
+      }
+      if (dev.el) dev.el.style.display = dev.on ? '' : 'none';
+      dev.frames.length = 0; dev.acc = 0;
+    }
+    function devReport() {
+      var f = dev.frames.slice().sort(function (a, b) { return a - b; });
+      var n = f.length, sum = 0;
+      for (var i = 0; i < n; i++) sum += f[i];
+      var avg = n ? 1000 * n / sum : 0;
+      var worst = n ? f[n - 1] : 0;
+      var low = n ? 1000 / f[Math.min(n - 1, Math.floor(n * 0.99))] : 0;
+      var info = renderer.info.render, mem = renderer.info.memory;
+      var heap = (performance && performance.memory) ? Math.round(performance.memory.usedJSHeapSize / 1048576) + ' MB' : 'n/a';
+      var ua = navigator.userAgent || '';
+      var lines = [
+        'FPS ' + avg.toFixed(0) + '  (1% low ' + low.toFixed(0) + ', worst frame ' + worst.toFixed(0) + ' ms)',
+        'draws ' + info.calls + '  tris ' + Math.round(info.triangles / 1000) + 'k  tex ' + mem.textures + '  geo ' + mem.geometries + '  heap ' + heap,
+        'screen ' + window.innerWidth + 'x' + window.innerHeight + ' @' + (window.devicePixelRatio || 1) +
+          '  render x' + renderer.getPixelRatio().toFixed(2) + (degraded ? ' (lowered: slow GPU)' : '') +
+          (IS_TOUCH ? '  touch' : ''),
+        'GPU ' + devGpu(),
+        'tiles ' + sim.count + '  pos ' + body.pos.x.toFixed(1) + ',' + body.pos.y.toFixed(1) + ',' + body.pos.z.toFixed(1) +
+          (body.inWater ? '  in water' : '') + '  t ' + Math.round(S.elapsed) + 's',
+        ua.slice(0, 160)
+      ];
+      if (dev.errors.length) {
+        lines.push('-- errors --');
+        dev.errors.forEach(function (er) { lines.push('[' + er.t + 's] ' + er.line + (er.n > 1 ? ' x' + er.n : '')); });
+      } else {
+        lines.push('no errors');
+      }
+      return lines.join('\n');
+    }
+    function devFrame(raw) {
+      if (raw > 0 && raw < 5) {
+        dev.frames.push(raw * 1000);
+        if (dev.frames.length > 240) dev.frames.shift();
+      }
+      dev.acc += raw;
+      if (dev.acc < 0.5 || !dev.el) return;
+      dev.acc = 0;
+      paintDev();
+    }
+    function paintDev() {
+      if (!dev.el) return;
+      var rep = devReport();
+      var copy = dev.el.querySelector('[data-copy]');
+      if (dev.full) {
+        dev.el.firstChild.textContent = rep;
+        copy.style.display = '';
+      } else {
+        // one line: the frame rate, and how many errors so far
+        var nErr = 0;
+        dev.errors.forEach(function (er) { nErr += er.n; });
+        dev.el.firstChild.textContent = rep.split('\n')[0].replace(/, worst frame [0-9]+ ms/, '') +
+          (nErr ? '  ·  ' + nErr + ' error' + (nErr > 1 ? 's' : '') : '') + '  ·  tap';
+        copy.style.display = 'none';
+      }
+    }
+
 
     // ---- reticle: the ghost balata under the cursor
     var ghostGeo = new THREE.BoxGeometry(1.94, TILE_TOP, 1.94);
@@ -9218,7 +9400,7 @@
     function showMainMenu() {
       var sum = menuSummary();
       if (!hasSave) { sum.metres = sum.tiles = sum.laid = sum.lira = 0; }
-      hud.showMenu({ mode: 'main', hasSave: hasSave, summary: sum, settings: SET });
+      hud.showMenu({ mode: 'main', hasSave: hasSave, summary: sum, settings: menuSettings() });
     }
 
     /* Personal best: the most sea this player ever had tiled at once (the
@@ -9278,7 +9460,7 @@
       save();
       releaseLook();
       hud.setPrompt(null);
-      hud.showMenu({ mode: 'pause', summary: menuSummary(), settings: SET });
+      hud.showMenu({ mode: 'pause', summary: menuSummary(), settings: menuSettings() });
       updateHint();
     }
     function resume() {
@@ -9331,6 +9513,7 @@
           camera.fov = SET.fov; camera.updateProjectionMatrix();
         } else if (v.key === 'view') setView(v.value === 'first', true);
         else if (v.key === 'bob') { SET.bob = !!v.value; saveSettings(); }
+        else if (v.key === 'debug' && dev.unlocked) { SET.debug = !!v.value; saveSettings(); setDev(SET.debug); }
       }
     }
 
@@ -9430,7 +9613,9 @@
        tick(dt) is what makes the game testable from the console. */
     function frame() {
       requestAnimationFrame(frame);
-      var dt = Math.min(clock.getDelta(), 0.05);
+      var raw = clock.getDelta();
+      if (dev.on) devFrame(raw);
+      var dt = Math.min(raw, 0.05);
       if (!dt) return;
       if (paused) {
         // the world holds still behind the pause menu; only the HUD animates
