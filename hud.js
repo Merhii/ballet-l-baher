@@ -11,6 +11,36 @@
 (function () {
   'use strict';
 
+  /* ------------------------------------------------------ install to phone
+     Only the published page (docs/) links a web app manifest; the offline
+     worker and the Install button exist only there, never in the artifact
+     or a file:// copy. The browser's install offer can arrive before the
+     HUD is built, so it is caught here, as the script loads. */
+  const PWA = { prompt: null, installed: false, listeners: [] };
+  (function () {
+    if (typeof window === 'undefined' || typeof document === 'undefined') return;
+    let hasManifest = false;
+    try { hasManifest = !!document.querySelector('link[rel="manifest"]'); } catch (e) { /* ignore */ }
+    if (!hasManifest || !window.addEventListener) return;
+    PWA.enabled = true;
+    try {
+      PWA.installed = !!(window.matchMedia && (window.matchMedia('(display-mode: fullscreen)').matches ||
+        window.matchMedia('(display-mode: standalone)').matches)) || navigator.standalone === true;
+    } catch (e) { /* ignore */ }
+    const ua = navigator.userAgent || '';
+    PWA.ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+    const tell = function () { PWA.listeners.forEach(function (f) { try { f(); } catch (e) { /* ignore */ } }); };
+    window.addEventListener('beforeinstallprompt', function (e) {
+      e.preventDefault();             // our own button asks, not a banner mid-game
+      PWA.prompt = e; tell();
+    });
+    window.addEventListener('appinstalled', function () { PWA.prompt = null; PWA.installed = true; tell(); });
+    if ('serviceWorker' in navigator && window.isSecureContext) {
+      const reg = function () { navigator.serviceWorker.register('sw.js').catch(function () { /* offline play just won't work */ }); };
+      if (document.readyState === 'complete') reg(); else window.addEventListener('load', reg);
+    }
+  })();
+
   /* ---------------------------------------------------------------- palette */
   // Authoritative hues from SPEC.md. Used as fallbacks when the game does not
   // pass a palette, and as the canonical source for the CSS custom properties.
@@ -1416,6 +1446,7 @@
             MB('settings', '04', 'E3dadat', 'settings', 'إعدادات') +
             MB('credits', '05', 'Credits', 'who is to blame', 'مين') +
             MB('share', '06', 'Share', 'send your best to a friend', 'شارك') +
+            MB('install', '07', 'Install', 'put the game on your home screen', 'نزّل') +
             MB('quit', '05', 'Save & quit', 'back to the main menu', 'خروج', 'warn') +
           '</nav>' +
           '<div class="blb-msum" data-sum></div>' +
@@ -1440,7 +1471,7 @@
     const sheet = intro.querySelector('[data-sheet]');
     const elSum = intro.querySelector('[data-sum]');
     const menuBtns = {};
-    ['continue', 'resume', 'new', 'howto', 'settings', 'credits', 'share', 'quit'].forEach(function (a) {
+    ['continue', 'resume', 'new', 'howto', 'settings', 'credits', 'share', 'install', 'quit'].forEach(function (a) {
       menuBtns[a] = intro.querySelector('[data-act="' + a + '"]');
     });
     let menuState = { mode: 'main', hasSave: false, summary: null, settings: {} };
@@ -1513,6 +1544,16 @@
             'harbour mole? Email <a href="mailto:' + CONTACT.email + '?subject=' +
             encodeURIComponent('Billboard on Ballet l Ba7er') + '">' + CONTACT.email + '</a>.</p>' +
           '<p>The sea does not issue receipts.</p></div>' + back;
+      } else if (name === 'install') {
+        html += '<h3>On your home screen <span class="ar">نزّل اللعبة</span></h3><div class="bd">' +
+          (PWA.ios
+            ? '<p>On iPhone and iPad, from <b>Safari</b>:</p>' +
+              '<p>1. Tap the <b>Share</b> button (the square with the arrow).<br>' +
+              '2. Scroll down and tap <b>Add to Home Screen</b>.<br>3. Tap <b>Add</b>.</p>'
+            : '<p>Open your browser\'s menu (⋮) and pick <b>Install app</b> or ' +
+              '<b>Add to Home screen</b>.</p>') +
+          '<p>It opens full screen like an app, and once you have played it once, it works ' +
+          'with no signal — on the corniche or anywhere else.</p></div>';
       } else if (name === 'confirm-new') {
         html += '<h3>Start over? <span class="ar">من جديد؟</span></h3><div class="blb-confirm">' +
           '<p>This throws away your saved sea — every balata, every lira. The sea will ' +
@@ -1565,6 +1606,21 @@
       }
       if (act === 'new' && menuState.hasSave) { openSheet('confirm-new'); return; }
       if (act === 'share') { share(); onMenu('share'); return; }
+      if (act === 'install') {
+        if (PWA.prompt) {
+          const p = PWA.prompt;
+          PWA.prompt = null;            // a prompt can only be shown once
+          p.prompt();
+          Promise.resolve(p.userChoice).then(function (c) {
+            if (c && c.outcome === 'accepted') PWA.installed = true;
+            paintMenu();
+          }, function () { paintMenu(); });
+        } else {
+          openSheet(sheetName === 'install' ? '' : 'install');
+        }
+        onMenu('install');
+        return;
+      }
       openSheet('');
       onMenu(act);
     });
@@ -1601,6 +1657,9 @@
       elSum.innerHTML = cells;
       // sharing is offered once there is a record worth bragging about
       menuBtns.share.hidden = !(s && s.share && s.share.metres > 0);
+      // install: on the published page, when not already running as the app,
+      // and when the browser offers it (or on iOS, which never offers but can)
+      menuBtns.install.hidden = !(PWA.enabled && !PWA.installed && (PWA.prompt || PWA.ios));
       resetShareBtn();
       // number the visible buttons 01, 02, ... in order
       let k = 0;
@@ -1675,6 +1734,7 @@
       focusFirst();
     }
     paintMenu();
+    PWA.listeners.push(function () { if (introOpen) paintMenu(); });
     r.appendChild(hurtEl);
     r.appendChild(faint);
     r.appendChild(adCard);

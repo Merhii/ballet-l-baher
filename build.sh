@@ -72,6 +72,13 @@ if os.path.exists(THREE_SRC):
         '<meta name="twitter:image" content="' + site + 'og-image.jpg">'
         '<link rel="icon" type="image/svg+xml" href="favicon.svg">'
         '<link rel="mask-icon" href="favicon.svg" color="#0b3a4f">'
+        # install to home screen: the manifest, the iOS icon and full-screen launch
+        '<link rel="manifest" href="manifest.webmanifest">'
+        '<link rel="apple-touch-icon" href="apple-touch-icon.png">'
+        '<meta name="mobile-web-app-capable" content="yes">'
+        '<meta name="apple-mobile-web-app-capable" content="yes">'
+        '<meta name="apple-mobile-web-app-title" content="Ballet l Ba7er">'
+        '<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">'
         + HEAD_RESET)
     page = ('<!doctype html><html lang="en"><head>' + head + '</head><body>'
             + body + '</body></html>')
@@ -84,7 +91,7 @@ if os.path.exists(THREE_SRC):
         os.makedirs('docs')
     io.open('docs/index.html', 'w', encoding='utf-8').write(page)
     io.open('docs/.nojekyll', 'w', encoding='utf-8').write('')
-    for name in ('favicon.svg', 'logo-trowel.svg'):
+    for name in ('favicon.svg', 'logo-trowel.svg', 'manifest.webmanifest', 'sw.js'):
         src = os.path.join('brand', name)
         if os.path.exists(src):
             io.open(os.path.join('docs', name), 'w', encoding='utf-8').write(
@@ -95,10 +102,11 @@ if os.path.exists(THREE_SRC):
         if os.path.exists(name):
             io.open(os.path.join('docs', name), 'w', encoding='utf-8').write(
                 io.open(name, encoding='utf-8').read())
-    # the link-preview image (binary: copied byte for byte)
-    if os.path.exists('brand/og-image.jpg'):
-        with open('brand/og-image.jpg', 'rb') as src, open('docs/og-image.jpg', 'wb') as dst:
-            dst.write(src.read())
+    # the link-preview image and the app icons (binary: copied byte for byte)
+    for name in ('og-image.jpg', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png'):
+        if os.path.exists(os.path.join('brand', name)):
+            with open(os.path.join('brand', name), 'rb') as src, open(os.path.join('docs', name), 'wb') as dst:
+                dst.write(src.read())
     for stale in ('docs/cms.html', 'docs/ads.js'):
         if os.path.exists(stale):
             os.remove(stale)

@@ -47,19 +47,25 @@ if (Test-Path $threeSrc) {
     '<meta property="og:image:alt" content="Blue tiles laid out into the sea off the Saida corniche, with the title Ballet l Ba7er">' +
     '<meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="' + $ogTitle + '">' +
     '<meta name="twitter:description" content="' + $desc + '"><meta name="twitter:image" content="' + $site + 'og-image.jpg">' +
-    '<link rel="icon" type="image/svg+xml" href="favicon.svg"><link rel="mask-icon" href="favicon.svg" color="#0b3a4f">' + $reset
+    '<link rel="icon" type="image/svg+xml" href="favicon.svg"><link rel="mask-icon" href="favicon.svg" color="#0b3a4f">' +
+    '<link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="apple-touch-icon.png">' +
+    '<meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes">' +
+    '<meta name="apple-mobile-web-app-title" content="Ballet l Ba7er">' +
+    '<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">' + $reset
   $page = '<!doctype html><html lang="en"><head>' + $head + '</head><body>' + $body + '</body></html>'
   Write-Text 'dist/standalone/index.html' $page
   Write-Text 'docs/index.html' $page
   Write-Text 'docs/.nojekyll' ''
-  foreach ($n in 'favicon.svg', 'logo-trowel.svg') {
+  foreach ($n in 'favicon.svg', 'logo-trowel.svg', 'manifest.webmanifest', 'sw.js') {
     if (Test-Path "brand/$n") { Write-Text "docs/$n" (Read-Text "brand/$n") }
   }
   # the ad list ships with the game; the CMS (cms.html) deliberately does not:
   # it is the owner's tool, opened locally from the repo
   if (Test-Path 'ads.json') { Write-Text 'docs/ads.json' (Read-Text 'ads.json') }
-  # the link-preview image (binary: copied, not re-encoded)
-  if (Test-Path 'brand/og-image.jpg') { Copy-Item 'brand/og-image.jpg' 'docs/og-image.jpg' -Force }
+  # the link-preview image and the app icons (binary: copied, not re-encoded)
+  foreach ($n in 'og-image.jpg', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png') {
+    if (Test-Path "brand/$n") { Copy-Item "brand/$n" "docs/$n" -Force }
+  }
   foreach ($n in 'docs/cms.html', 'docs/ads.js') { if (Test-Path $n) { Remove-Item $n } }
   '{0:N1} KB  standalone/index.html + docs/index.html (three.js inlined)' -f ($page.Length / 1024)
 } else {

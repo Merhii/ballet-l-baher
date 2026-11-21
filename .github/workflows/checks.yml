@@ -28,7 +28,7 @@ jobs:
 
       - name: Scripts parse
         run: |
-          for f in ads.js physics.js world.js hud.js game.js test/smoke.js; do
+          for f in ads.js physics.js world.js hud.js game.js brand/sw.js test/smoke.js; do
             node --check "$f"
           done
 
@@ -43,6 +43,19 @@ jobs:
               if (a.url && !/^https:\/\//.test(a.url)) throw new Error("ads.json: " + a.id + " link must be https");
             }
             console.log(j.ads.length + " ad(s) ok");
+          '
+
+      - name: App manifest is valid
+        run: |
+          node -e '
+            const fs = require("fs");
+            const m = JSON.parse(fs.readFileSync("brand/manifest.webmanifest", "utf8"));
+            if (!m.name || !m.start_url || !m.display) throw new Error("manifest: missing name, start_url or display");
+            for (const i of m.icons || []) {
+              if (!fs.existsSync("brand/" + i.src)) throw new Error("manifest: icon not found: " + i.src);
+            }
+            if (!(m.icons || []).some(i => i.sizes === "512x512")) throw new Error("manifest: needs a 512px icon");
+            console.log("manifest ok, " + m.icons.length + " icons");
           '
 
       - name: Smoke tests
