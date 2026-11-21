@@ -4953,6 +4953,12 @@
     } catch (e) { /* ignore */ }
     const ua = navigator.userAgent || '';
     PWA.ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+    // the Install button is for phones and tablets only: a touch screen with
+    // no mouse. Desktop browsers offer installing too, but not from our menu.
+    try {
+      PWA.mobile = PWA.ios || /Android|Mobi/i.test(ua) ||
+        !!(window.matchMedia && window.matchMedia('(hover: none) and (pointer: coarse)').matches);
+    } catch (e) { PWA.mobile = PWA.ios; }
     const tell = function () { PWA.listeners.forEach(function (f) { try { f(); } catch (e) { /* ignore */ } }); };
     window.addEventListener('beforeinstallprompt', function (e) {
       e.preventDefault();             // our own button asks, not a banner mid-game
@@ -6588,7 +6594,7 @@
       menuBtns.share.hidden = !(s && s.share && s.share.metres > 0);
       // install: on the published page, when not already running as the app,
       // and when the browser offers it (or on iOS, which never offers but can)
-      menuBtns.install.hidden = !(PWA.enabled && !PWA.installed && (PWA.prompt || PWA.ios));
+      menuBtns.install.hidden = !(PWA.enabled && PWA.mobile && !PWA.installed && (PWA.prompt || PWA.ios));
       resetShareBtn();
       // number the visible buttons 01, 02, ... in order
       let k = 0;
