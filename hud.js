@@ -135,8 +135,11 @@
     const pre = el('link'); pre.rel = 'preconnect'; pre.href = 'https://fonts.gstatic.com';
     pre.crossOrigin = '';
     const l = el('link'); l.rel = 'stylesheet';
+    // Barlow Condensed + Reem Kufi: the look. Barlow + IBM Plex Sans Arabic:
+    // small text that has to stay readable. Poppins: billboard ads that ask for it.
     l.href = 'https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700&' +
-             'family=Reem+Kufi:wght@400;500;600;700&display=swap';
+             'family=Barlow:wght@500;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600&' +
+             'family=Reem+Kufi:wght@400;500;600;700&family=Poppins:wght@500;700&display=swap';
     document.head.appendChild(pre);
     document.head.appendChild(l);
   }
@@ -719,6 +722,16 @@
 '  .blb-mbtn{padding:6px 10px 7px;} .blb-mbtn .s{display:none;}',
 '  .blb-mpanel,.blb-msheet{align-self:flex-start;}',
 '}',
+/* --- small type gets text faces. Reem Kufi stays on titles, signs and big
+   Arabic; Barlow Condensed stays on headings, numbers and buttons. -------- */
+'.blb-hp .ar,.blb-say .ar,.blb-mbtn .a,.blb-hero .arl,.blb-sea .ar,.blb-msheet h3 .ar{',
+'  font-family:var(--blb-artext);font-weight:500;letter-spacing:0;}',
+'.blb-say .ar{opacity:.75;} .blb-mbtn .a{opacity:.85;}',
+'.blb-lbl,.blb-cell .k,.blb-hp .k,.blb-hp .num,.blb-hero .en,.blb-buff,.blb-mbtn .s,',
+'.blb-set .k small,.blb-say .nm,.blb-heckle .nm,.blb-msum div,.blb-mfoot,.blb-phase,',
+'.blb-kft,.blb-iload .tx,.blb-adbody .who,.blb-adbody .note,.blb-sea .nm{',
+'  font-family:var(--blb-label);letter-spacing:.04em;}',
+'.blb-mbtn .s,.blb-set .k small,.blb-adbody .note{letter-spacing:0;}',
 /* --- compact HUD for short screens: a phone held sideways is wide but only
    ~360-430px tall, so the width-based rules above never apply. The stats
    become a two-column block in the corner, clear of the thumb stick. ----- */
@@ -730,27 +743,27 @@
 '  .blb-hero .fig .v{font-size:24px;} .blb-hero .fig .u{font-size:11px;}',
 '  .blb-hero .en,.blb-hero .arl,.blb-hero .rule{display:none;}',
 '  .blb-barrow{grid-template-columns:auto 1fr;gap:5px;padding:3px 7px;}',
-'  .blb-barrow svg{width:34px;height:21px;} .blb-barrow .blb-lbl{font-size:8px;letter-spacing:.08em;}',
+'  .blb-barrow svg{width:34px;height:21px;} .blb-barrow .blb-lbl{font-size:9px;letter-spacing:.03em;}',
 '  .blb-barrow .mline{margin-top:0;} .blb-barrow .mv{font-size:15px;} .blb-barrow .mm{font-size:10px;}',
-'  .blb-hp{padding:3px 7px 4px;} .blb-hp .k{font-size:8px;letter-spacing:.08em;}',
-'  .blb-hp .ar{display:none;} .blb-hp .num{font-size:9px;} .blb-hp .heart{width:8px;height:7px;margin-right:3px;}',
+'  .blb-hp{padding:3px 7px 4px;} .blb-hp .k{font-size:9px;letter-spacing:.03em;}',
+'  .blb-hp .ar{display:none;} .blb-hp .num{font-size:9.5px;} .blb-hp .heart{width:8px;height:7px;margin-right:3px;}',
 '  .blb-hp .track{height:7px;margin-top:3px;border-width:1.5px;}',
 '  .blb-row{gap:4px;} .blb-cell{padding:2px 6px 3px;}',
-'  .blb-cell .v{font-size:14px;} .blb-cell .k{font-size:7.5px;letter-spacing:.06em;}',
+'  .blb-cell .v{font-size:14px;} .blb-cell .k{font-size:9px;letter-spacing:.03em;}',
 '  .blb-sea{padding:3px 7px;display:flex;align-items:center;}',
-'  .blb-sea .hd{flex:1;} .blb-sea .nm{font-size:9px;letter-spacing:.06em;} .blb-sea .ar{font-size:9px;}',
+'  .blb-sea .hd{flex:1;} .blb-sea .nm{font-size:9.5px;letter-spacing:.03em;} .blb-sea .ar{font-size:10px;}',
 '  .blb-sea svg,.blb-sea .pips{display:none;}',
-'  .blb-buffs{grid-column:1 / -1;order:10;gap:4px;} .blb-buff{font-size:8.5px;padding:2px 5px 3px;}',
+'  .blb-buffs{grid-column:1 / -1;order:10;gap:4px;} .blb-buff{font-size:9.5px;padding:2px 5px 3px;}',
 '  .blb-tr{top:8px;right:8px;gap:5px;} .blb-phase{font-size:8.5px;padding:3px 6px 4px;}',
 '  .blb-snd,.blb-menubtn{width:30px;height:26px;}',
 '  .blb-toasts{top:42px;right:8px;width:min(250px,34vw);gap:4px;}',
 '  .blb-toast .bar{width:5px;flex:0 0 5px;} .blb-toast .tx{font-size:10.5px;padding:3px 7px 4px;line-height:1.2;}',
 '  .blb-toast:nth-last-child(n+4){display:none;}',
 '  .blb-heckle{left:8px;top:150px;bottom:auto;width:min(260px,40vw);padding:5px 8px 7px;}',
-'  .blb-heckle .tx{font-size:12px;} .blb-heckle .nm{font-size:8px;}',
+'  .blb-heckle .tx{font-size:12px;} .blb-heckle .nm{font-size:9px;}',
 '  .blb-prompt{margin-top:20px;} .blb-prompt .tx{font-size:11px;padding:3px 9px 4px;}',
 '  .blb-say{max-width:min(220px,40vw);padding:5px 8px 6px;} .blb-say .tx{font-size:12px;}',
-'  .blb-say .nm{font-size:8px;} .blb-say .ar{font-size:10.5px;}',
+'  .blb-say .nm{font-size:9px;} .blb-say .ar{font-size:11px;}',
 '  .blb-adbox{width:min(780px,100%);display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);}',
 '  .blb-adbox .cap{grid-column:1 / -1;height:6px;}',
 '  .blb-adbox img{align-self:center;border-bottom:0;border-right:2px solid var(--blb-ink);}',
@@ -768,7 +781,7 @@
 '  .blb-mnav{padding:8px 14px 2px;gap:4px;}',
 '  .blb-mbtn{padding:4px 10px 5px;grid-template-columns:24px 1fr auto;box-shadow:2px 2px 0 0 var(--blb-ink);}',
 '  .blb-mbtn .l{font-size:14px;} .blb-mbtn .n{font-size:10px;} .blb-mbtn .a{font-size:13px;}',
-'  .blb-msum{margin:6px 14px 0;padding-top:4px;} .blb-msum b{font-size:14px;} .blb-msum div{font-size:8px;}',
+'  .blb-msum{margin:6px 14px 0;padding-top:4px;} .blb-msum b{font-size:14px;} .blb-msum div{font-size:9px;}',
 '  .blb-mfoot,.blb-menu .blb-stamp{display:none;}',
 '  .blb-menu.sheet .blb-mpanel{display:none;}',
 '  .blb-msheet{flex:1 1 auto;max-width:620px;margin:0 auto;align-self:flex-start;max-height:calc(100vh - 16px);}',
@@ -841,6 +854,10 @@
                     '"Helvetica Neue Condensed",Impact,sans-serif',
       '--blb-kufi': '"Reem Kufi","Noto Naskh Arabic","Geeza Pro","Al Bayan",' +
                     'Tahoma,sans-serif',
+      // small type: Kufi and condensed caps are display faces and go to
+      // mush at 8-13px, so tiny labels and small Arabic get text faces
+      '--blb-label': '"Barlow","Helvetica Neue",Arial,sans-serif',
+      '--blb-artext': '"IBM Plex Sans Arabic","Noto Sans Arabic","Geeza Pro",Tahoma,sans-serif',
       '--blb-grain': grain() ? 'url(' + grain() + ')' : 'none'
     };
     for (const k in v) node.style.setProperty(k, v[k]);

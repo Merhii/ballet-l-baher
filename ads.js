@@ -35,7 +35,7 @@
       tagline: 'Mirror · 360 · Mosaic  —  puzzleslb.com/puzzlebooth', layout: 'poster',
       bg: '#000000', fg: '#FFFFFF', accent: '#34AD54',
       placements: ['corniche-w'], weight: 1, start: '', end: '',
-      url: 'https://www.puzzleslb.com/puzzlebooth/', cta: 'Visit PuzzleBooth'
+      url: 'https://www.puzzleslb.com/puzzlebooth/', cta: 'Visit PuzzleBooth', font: 'poppins'
     }
   ];
 
@@ -100,7 +100,8 @@
         start: str(a.start, 10),
         end: str(a.end, 10),
         url: safeUrl(a.url),          // where "Visit" goes when a player presses E at the board
-        cta: str(a.cta, 30)
+        cta: str(a.cta, 30),
+        font: FONTS[a.font] ? a.font : 'condensed'
       });
     }
     return out;
@@ -137,7 +138,31 @@
 
   // ---------------------------------------------------------------- render
   var AR_FONT = '"Reem Kufi","Noto Naskh Arabic","Geeza Pro","Al Bayan","Segoe UI",sans-serif';
-  var LAT_FONT = '"Barlow Condensed",system-ui,-apple-system,"Segoe UI",sans-serif';
+  /* The Latin face an ad is painted in. Condensed is the game's own signage
+     look; Poppins is there for brands that use it (PuzzleBooth does). */
+  var FONTS = {
+    condensed: { name: 'Barlow Condensed (game signage)', family: '"Barlow Condensed"',
+      stack: '"Barlow Condensed",system-ui,-apple-system,"Segoe UI",sans-serif' },
+    poppins: { name: 'Poppins (rounder, modern)', family: 'Poppins',
+      stack: 'Poppins,system-ui,-apple-system,"Segoe UI",sans-serif' }
+  };
+  var LAT_FONT = FONTS.condensed.stack;     // swapped per ad inside draw()
+
+  /* Make sure the faces a list of ads uses are loaded before painting:
+     a canvas does not wait for webfonts, it just draws the fallback. */
+  function loadFonts(list, cb) {
+    var done = function () { if (cb) cb(); };
+    if (typeof document === 'undefined' || !document.fonts || !document.fonts.load) { done(); return; }
+    var want = {};
+    (list || []).forEach(function (a) { want[a.font || 'condensed'] = true; });
+    var jobs = [];
+    Object.keys(want).forEach(function (k) {
+      var f = FONTS[k] || FONTS.condensed;
+      jobs.push(document.fonts.load('700 40px ' + f.family));
+      jobs.push(document.fonts.load('600 40px ' + f.family));
+    });
+    Promise.all(jobs).then(done, done);
+  }
 
   /* Shrink a font until the line fits, so long CMS copy never runs off. */
   function fit(g, text, weight, size, family, maxW) {
@@ -168,6 +193,7 @@
   /* Paint one ad into a w×h canvas context. Aspect is assumed ~2:1. */
   function draw(g, w, h, ad) {
     ad = ad || normalize([{}])[0];
+    LAT_FONT = (FONTS[ad.font] || FONTS.condensed).stack;
     var pad = Math.round(h * 0.07);
     g.save();
     g.textAlign = 'left';
@@ -240,6 +266,7 @@
     g.fillStyle = '#EDF6F3';
     g.fillText('AD', w - pad * 0.3 - h * 0.05, pad * 0.25 + h * 0.08);
     g.restore();
+    LAT_FONT = FONTS.condensed.stack;
   }
 
   function wrap(g, text, x, y, maxW, size, col, maxLines) {
@@ -322,6 +349,7 @@
   }
 
   root.BLB_ADS = {
+    FONTS: FONTS, loadFonts: loadFonts,
     DEFAULTS: DEFAULTS, VACANT: VACANT, PLACEMENTS: PLACEMENTS, PLACEMENT_NAMES: PLACEMENT_NAMES, LAYOUTS: LAYOUTS,
     PREVIEW_KEY: PREVIEW_KEY, STATS_KEY: STATS_KEY,
     normalize: normalize, eligible: eligible, pick: pick, draw: draw, load: load,

@@ -1540,6 +1540,8 @@
       adList = list || [];
       adSource = source || 'ads.json';
       for (var i = 0; i < boards.length; i++) nextAd(boards[i]);
+      // an ad may use a face the page has not fetched yet: repaint once it lands
+      ADS.loadFonts(adList, function () { boards.forEach(paintBoard); });
     }
     if (ADS && boards.length) {
       setAds(adList, 'defaults');

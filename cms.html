@@ -7,7 +7,7 @@
 <meta name="robots" content="noindex">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Reem+Kufi:wght@500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Reem+Kufi:wght@500;700&family=Poppins:wght@500;700&display=swap" rel="stylesheet">
 <style>
   :root {
     --ink: #0B3A4F; --paper: #F4EEDD; --card: #FFFDF6; --line: rgba(11,58,79,.18);
@@ -149,6 +149,8 @@
         <label class="f">Tagline<small>small print</small><input type="text" id="tagline" maxlength="80"></label>
         <label class="f">Layout
           <select id="layout"><option value="poster">Poster</option><option value="split">Split</option><option value="stamp">Stamp</option></select></label>
+        <label class="f">Font<small>for the Latin text on the board</small>
+          <select id="font"></select></label>
         <label class="f">Weight <small id="weightV"></small><small>how often it comes up against other ads (0 pauses it)</small>
           <input type="range" id="weight" min="0" max="10" step="1"></label>
         <label class="f">Link<small>where “Visit” goes when a player presses E at the board (https only)</small>
@@ -289,7 +291,16 @@
   }
 
   // --------------------------------------------------------------- editor
-  var fields = ['sponsor', 'ar', 'headline', 'tagline', 'layout', 'weight', 'url', 'cta', 'start', 'end', 'bg', 'fg', 'accent'];
+  var fields = ['sponsor', 'ar', 'headline', 'tagline', 'layout', 'font', 'weight', 'url', 'cta', 'start', 'end', 'bg', 'fg', 'accent'];
+  Object.keys(A.FONTS).forEach(function (k) {
+    var o = document.createElement('option');
+    o.value = k; o.textContent = A.FONTS[k].name;
+    $('font').appendChild(o);
+  });
+  // fonts change the painted boards: redraw once a newly picked face is in
+  $('font').addEventListener('change', function () {
+    A.loadFonts(ads, function () { renderList(); drawBig(); });
+  });
   function renderEditor() {
     var has = ads.length > 0;
     $('editor').classList.toggle('hide', !has);
@@ -505,7 +516,11 @@
       if (hadPreview) A.writePreview(hadPreview);
     }, OFF_DISK ? LIVE_ADS : 'ads.json');
   }
-  if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { render(); });
+  // repaint the previews once the faces the ads use have actually loaded
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(function () { A.loadFonts(ads, render); });
+    setTimeout(function () { A.loadFonts(ads, render); }, 2500);
+  }
 })();
 </script>
 </body>
