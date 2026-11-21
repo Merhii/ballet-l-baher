@@ -671,6 +671,10 @@
 '  grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;}',
 '.blb-msum div{font-size:9.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;opacity:.75;}',
 '.blb-msum b{display:block;font-size:20px;letter-spacing:0;opacity:1;font-variant-numeric:tabular-nums;color:var(--blb-ink);}',
+'.blb-msum{grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);grid-template-columns:none;}',
+'.blb-msum .best b{color:var(--blb-terra);}',
+'.blb-mbtn.done .s{opacity:1;font-weight:700;}',
+'.blb-faint .best{margin-top:2px;font-size:13px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;opacity:.8;}',
 '.blb-mfoot{margin:12px 20px 0;font-size:10px;letter-spacing:.1em;text-transform:uppercase;opacity:.55;line-height:1.5;}',
 '.blb-menu .blb-iload{margin:12px 20px 0;width:auto;}',
 '.blb-msheet{position:relative;flex:1 1 auto;max-width:560px;align-self:center;display:none;',
@@ -1028,14 +1032,17 @@
     // passing out: a full-screen card while the game moves you to safety
     const faint = el('div', 'blb-faint');
     faint.innerHTML = '<div class="ar">غمي عليك</div><div class="en">Ghme 3alék</div>' +
-      '<div class="tx" data-ftx></div><div class="bill" data-fbill></div>';
+      '<div class="tx" data-ftx></div><div class="bill" data-fbill></div><div class="best" data-fbest></div>';
     const elFaintTx = faint.querySelector('[data-ftx]');
     const elFaintBill = faint.querySelector('[data-fbill]');
+    const elFaintBest = faint.querySelector('[data-fbest]');
     function showFaint(o) {
       o = o || {};
       elFaintTx.textContent = o.text || '';
       elFaintBill.textContent = o.bill || '';
       elFaintBill.style.display = o.bill ? 'block' : 'none';
+      elFaintBest.textContent = o.best > 0 ? 'Your best · ' + fmt(o.best) + ' m² of sea' : '';
+      elFaintBest.style.display = o.best > 0 ? 'block' : 'none';
       faint.classList.add('on');
     }
     function hideFaint() { faint.classList.remove('on'); }
@@ -1408,6 +1415,7 @@
             MB('howto', '03', 'Kif bteshtghel', 'how to play', 'كيف') +
             MB('settings', '04', 'E3dadat', 'settings', 'إعدادات') +
             MB('credits', '05', 'Credits', 'who is to blame', 'مين') +
+            MB('share', '06', 'Share', 'send your best to a friend', 'شارك') +
             MB('quit', '05', 'Save & quit', 'back to the main menu', 'خروج', 'warn') +
           '</nav>' +
           '<div class="blb-msum" data-sum></div>' +
@@ -1432,7 +1440,7 @@
     const sheet = intro.querySelector('[data-sheet]');
     const elSum = intro.querySelector('[data-sum]');
     const menuBtns = {};
-    ['continue', 'resume', 'new', 'howto', 'settings', 'credits', 'quit'].forEach(function (a) {
+    ['continue', 'resume', 'new', 'howto', 'settings', 'credits', 'share', 'quit'].forEach(function (a) {
       menuBtns[a] = intro.querySelector('[data-act="' + a + '"]');
     });
     let menuState = { mode: 'main', hasSave: false, summary: null, settings: {} };
@@ -1556,6 +1564,7 @@
         return;
       }
       if (act === 'new' && menuState.hasSave) { openSheet('confirm-new'); return; }
+      if (act === 'share') { share(); onMenu('share'); return; }
       openSheet('');
       onMenu(act);
     });
@@ -1581,13 +1590,72 @@
       // "new game" is only worth showing when there is something to throw away
       if (!menuState.hasSave) menuBtns['new'].hidden = true;
       const s = menuState.summary;
+      let cells = '';
       if (s && (s.tiles || s.lira || s.laid)) {
-        elSum.style.display = '';
-        elSum.innerHTML = '<div><b>' + fmt(s.metres || 0) + '</b>m² standing</div>' +
+        cells += '<div><b>' + fmt(s.metres || 0) + '</b>m² standing</div>' +
           '<div><b>' + fmt(s.laid || 0) + '</b>balat laid</div>' +
           '<div><b>' + fmt(s.lira || 0) + '</b>lira</div>';
+      }
+      if (s && s.best > 0) cells += '<div class="best"><b>' + fmt(s.best) + '</b>m² your best</div>';
+      elSum.style.display = cells ? '' : 'none';
+      elSum.innerHTML = cells;
+      // sharing is offered once there is a record worth bragging about
+      menuBtns.share.hidden = !(s && s.share && s.share.metres > 0);
+      resetShareBtn();
+      // number the visible buttons 01, 02, ... in order
+      let k = 0;
+      intro.querySelectorAll('.blb-mnav .blb-mbtn').forEach(function (b) {
+        if (!b.hidden) b.querySelector('.n').textContent = ('0' + (++k)).slice(-2);
+      });
+    }
+
+    /* Share: the phone's own share sheet (WhatsApp, Instagram, ...) where
+       there is one, else the text and link go to the clipboard. The button
+       itself says what happened, since toasts are hidden under the menu. */
+    function resetShareBtn() {
+      const b = menuBtns.share;
+      b.querySelector('.s').textContent = 'send your best to a friend';
+      b.classList.remove('done');
+    }
+    function shareNote(msg) {
+      const b = menuBtns.share;
+      b.querySelector('.s').textContent = msg;
+      b.classList.add('done');
+    }
+    function copyText(text) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        return navigator.clipboard.writeText(text).catch(function () { return copyOld(text); });
+      }
+      return copyOld(text);
+    }
+    function copyOld(text) {
+      return new Promise(function (ok, fail) {
+        const ta = document.createElement('textarea');
+        ta.value = text; ta.setAttribute('readonly', '');
+        ta.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0;';
+        document.body.appendChild(ta); ta.select();
+        let done = false;
+        try { done = document.execCommand('copy'); } catch (e) { /* ignore */ }
+        document.body.removeChild(ta);
+        if (done) ok(); else fail(new Error('copy failed'));
+      });
+    }
+    function share() {
+      const sh = menuState.summary && menuState.summary.share;
+      if (!sh) return;
+      const all = sh.text + ' ' + sh.url;
+      const fallback = function () {
+        copyText(all).then(function () { shareNote('copied — paste it in any chat'); },
+          function () { shareNote(sh.url); });
+      };
+      if (navigator.share) {
+        navigator.share({ title: sh.title, text: sh.text, url: sh.url }).then(function () {
+          shareNote('sent. yalla, now beat it yourself');
+        }, function (e) {
+          if (!e || e.name !== 'AbortError') fallback();
+        });
       } else {
-        elSum.style.display = 'none';
+        fallback();
       }
     }
 

@@ -970,6 +970,7 @@
       S.lira += PAY_PER_BALATA;
       S.laid++;
       tiles.add(cellTmp.i, cellTmp.j, 0);
+      noteBest();
       sfx.clack();
       fx.burst(cellCentreX(cellTmp.i), TILE_TOP, cellCentreZ(cellTmp.j), 0.55);
       mason.state.lay = 1;
@@ -1669,7 +1670,8 @@
       hud.showFaint({
         text: (FAINT_LINES[S.faintCause] || FAINT_LINES.starve) +
           (spilt > 0 ? ' Half the barrow went with you.' : ''),
-        bill: bill > 0 ? 'Hospital bill · ' + bill + ' l.l.' : 'Hospital bill · waived. You had nothing.'
+        bill: bill > 0 ? 'Hospital bill · ' + bill + ' l.l.' : 'Hospital bill · waived. You had nothing.',
+        best: best.metres
       });
       npcEvent('spent');
       pushStats();
@@ -1751,11 +1753,66 @@
 
     // ---------------------------------------------------------------- menu
     function menuSummary() {
-      return { metres: sim.count * 4, tiles: sim.count, laid: S.laid, lira: Math.floor(S.lira) };
+      noteBest();
+      return { metres: sim.count * 4, tiles: sim.count, laid: S.laid, lira: Math.floor(S.lira),
+               best: best.metres, share: shareInfo() };
     }
     var hasSave = false;
     function showMainMenu() {
-      hud.showMenu({ mode: 'main', hasSave: hasSave, summary: hasSave ? menuSummary() : null, settings: SET });
+      var sum = menuSummary();
+      if (!hasSave) { sum.metres = sum.tiles = sum.laid = sum.lira = 0; }
+      hud.showMenu({ mode: 'main', hasSave: hasSave, summary: sum, settings: SET });
+    }
+
+    /* Personal best: the most sea this player ever had tiled at once (the
+       sea takes tiles back, so the peak, not the current pier). Kept in this
+       browser apart from the save, so a new game does not wipe it. */
+    var BEST_KEY = 'blb.best';
+    var best = { metres: 0, laid: 0 };
+    try {
+      var rawBest = JSON.parse(localStorage.getItem(BEST_KEY) || 'null');
+      if (rawBest) {
+        best.metres = Math.max(0, Math.floor(+rawBest.metres || 0));
+        best.laid = Math.max(0, Math.floor(+rawBest.laid || 0));
+      }
+    } catch (e) { /* private window */ }
+    var bestAtLoad = best.metres, bestCheered = false, bestDirty = false;
+    function noteBest() {
+      var m = sim.count * 4;
+      // the five starter tiles are not a record until the player lays one
+      if (S.laid > 0 && m > best.metres) {
+        best.metres = m; bestDirty = true;
+        // cheer once a session, and only when an earlier record was beaten
+        if (S.started && bestAtLoad > 0 && !bestCheered) {
+          bestCheered = true;
+          hud.toast('New personal best: ' + m + ' m² of sea!', 'good');
+        }
+      }
+      if (S.laid > best.laid) { best.laid = S.laid; bestDirty = true; }
+    }
+    function saveBest() {
+      if (!bestDirty) return;
+      bestDirty = false;
+      try { localStorage.setItem(BEST_KEY, JSON.stringify(best)); } catch (e) { /* ignore */ }
+    }
+    // the link people get: this page when it is on the web, else the public site
+    var SITE = 'https://merhii.github.io/ballet-l-baher/';
+    function shareInfo() {
+      var url = SITE;
+      try {
+        if (/^https:$/.test(location.protocol) && !/^(localhost|127\.|\[::1\])/.test(location.hostname)) {
+          url = location.origin + location.pathname;
+        }
+      } catch (e) { /* ignore */ }
+      var m = best.metres;
+      return {
+        metres: m,
+        title: 'Ballet l Ba7er — بلّط البحر',
+        text: m > 0
+          ? 'I tiled ' + m + ' m² of the sea off the Saida corniche 🌊 بلّط البحر. Beat that:'
+          : 'They told me to go tile the sea, so I did 🌊 بلّط البحر:',
+        url: url
+      };
     }
     function pause() {
       if (!S.started || paused) return;
@@ -1788,7 +1845,8 @@
     }
     function resetGame() {
       var all = [];
-      sim.forEach(function (tl) { all.push(tl); });
+      // forEach reuses one scratch object, so copy the coordinates out
+      sim.forEach(function (tl) { all.push({ i: tl.i, j: tl.j }); });
       for (var n = 0; n < all.length; n++) sim.remove(all[n].i, all[n].j);
       tiles.clear();
       S.health = HEALTH_MAX; S.hp = HP_MAX; S.lira = 0; S.knefeEaten = 0;
@@ -1845,6 +1903,7 @@
     }
     function save() {
       try { localStorage.setItem(SAVE_KEY, JSON.stringify(serialize())); } catch (e) { /* private window */ }
+      noteBest(); saveBest();
     }
     function applySave(d) {
       if (!d || d.v !== 4) return false;
@@ -2170,7 +2229,8 @@
       waves: waves, cam: cam, hud: hud, renderer: renderer, scene: scene,
       tick: tick, npcSay: npcSay, npcEvent: npcEvent, sfx: sfx,
       damage: damage, pause: pause, resume: resume, onMenu: onMenu, boards: boards,
-      settings: SET, foods: FOODS, adSource: function () { return adSource; }
+      settings: SET, foods: FOODS, adSource: function () { return adSource; },
+      best: function () { noteBest(); return { metres: best.metres, laid: best.laid }; }, share: shareInfo
     };
   }
 
