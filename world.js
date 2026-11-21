@@ -713,8 +713,13 @@
         const st = STAIR[s];
         mMas.box(shade(limestone, -0.05, c), x, (st.top + 0.26) * 0.5 - 0.2, (st.z1 + st.z2) * 0.5,
           0.7, st.top + 1.6, st.z2 - st.z1, 0, 0, 0, 1 / 6);
+        // collide with the stone you can see: each cheek block's top is
+        // st.top + 0.73. (One flat 1.5 m box used to leave an invisible shelf
+        // above the lower blocks and a walkable beam out over the water.)
+        coll(side * 5.0, st.z1, side * 5.7, st.z2, st.top + 0.73);
       }
-      coll(side * 5.0, -2, side * 5.7, 2.9, 1.5);
+      // the last stretch beside the apron, down to the water
+      coll(side * 5.0, STAIR[STAIR.length - 1].z2, side * 5.7, 2.9, STAIR[STAIR.length - 1].top + 0.73);
     }
     // handrail: posts on the right-hand cheek, rail following the flight
     const hx = 5.05, rust = C0.RUST;

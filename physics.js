@@ -212,8 +212,12 @@
       wadeDepth: 0.55,    // standing on a tile with the wash over you != swimming
       enterDepth: 0.35,   // feet this far under before we call it "in the water"
       climbReach: 0.55,
-      climbMaxRise: 1.20, // tiles (0.3) and the stair apron: yes. Deck (1.5): no.
+      climbMaxRise: 1.20, // tiles (0.3) and the stair apron: a quick haul-out
       climbTime: 0.55,    // sluggish haul-out; `jump` skips the wait
+      // the corniche sea wall (deck at 1.5) can be climbed too, just slower:
+      // keep pushing into it, and a wave lifting you helps
+      climbWallRise: 2.0,
+      climbWallTime: 1.1,
       boundsX: 150, boundsZmin: -40, boundsZmax: 830
     },
 
@@ -930,6 +934,7 @@
     };
 
     let climbT = 0;
+    let climbNeed = TUNING.player.climbTime;   // seconds the current haul-out takes
 
     // Highest surface under (x,z), ignoring reachability. Used for haul-out and
     // for the ledge guard.
@@ -1035,6 +1040,19 @@
       return g === null || (feetY - g) > P.stepDown;
     }
 
+    // Would a body standing at (x,z) with its feet at feetY be inside a wall,
+    // a kiosk or a railing? Used so a haul-out never lands you in one.
+    function headBlocked(x, z, feetY) {
+      const rad = TUNING.player.radius;
+      for (let n = 0; n < nCol; n++) {
+        if (!blocks(n, feetY)) continue;
+        if (x + rad <= cx1[n] || x - rad >= cx2[n]) continue;
+        if (z + rad <= cz1[n] || z - rad >= cz2[n]) continue;
+        return true;
+      }
+      return false;
+    }
+
     function clampBounds() {
       const P = TUNING.player;
       if (pos.x < -P.boundsX) pos.x = -P.boundsX;
@@ -1078,7 +1096,7 @@
 
       clampBounds();
       body.speed = Math.sqrt(vel.x * vel.x + vel.z * vel.z);
-      body.climbProgress = climbT / P.climbTime;
+      body.climbProgress = Math.min(1, climbT / climbNeed);
       updateOnTile();
       return body;
     }
@@ -1200,16 +1218,22 @@
       pos.y += vel.y * dt;
 
       // Haul-out: push into an adjacent ledge (a tile at 0.3, or the stair
-      // apron) for climbTime seconds, or hit jump to skip the wait. The deck at
-      // y = 1.5 is out of reach on purpose — the stairs are the way back up.
+      // apron) for climbTime seconds, or hit jump to skip the wait. The sea
+      // wall up to the deck (1.5) works the same way but takes climbWallTime,
+      // so the stairs stay the easy way up without the wall being a trap.
       if (mlen > 0.1) {
         const inv = 1 / Math.max(1e-4, Math.sqrt(mx * mx + mz * mz));
         const px = pos.x + mx * inv * P.climbReach;
         const pz = pos.z + mz * inv * P.climbReach;
         const ledge = ledgeTop(px, pz);
-        if (ledge !== null && ledge - surf < P.climbMaxRise && ledge - surf > -0.6) {
+        const rise = ledge === null ? 0 : ledge - surf;
+        const high = rise >= P.climbMaxRise;
+        if (ledge !== null && rise < (high ? P.climbWallRise : P.climbMaxRise) && rise > -0.6 &&
+            supportAt(px, pz, ledge) !== null && !headBlocked(px, pz, ledge)) {
           climbT += dt;
-          if (climbT >= P.climbTime || input.jump) {
+          climbNeed = high ? P.climbWallTime : P.climbTime;
+          // jump skips the wait on a low ledge; a wall is always a real pull-up
+          if (climbT >= (high ? P.climbWallTime : P.climbTime) || (input.jump && !high)) {
             pos.x = px; pos.z = pz; pos.y = ledge;
             vel.set(0, 0, 0);
             body.inWater = false;
