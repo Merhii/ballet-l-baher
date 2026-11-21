@@ -47,15 +47,29 @@ if os.path.exists(THREE_SRC):
         raise SystemExit('standalone build still references a CDN')
     desc = ('Tile the Mediterranean off the Saida corniche while the sea takes '
             'your edges back. A 3D browser game of the Lebanese saying.')
+    # where the game lives: link previews need absolute URLs. Change here for a new domain.
+    site = 'https://merhii.github.io/ballet-l-baher/'
+    og_title = u'Ballet l Ba7er — بلّط البحر'
     head = (
         '<meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">'
         '<meta name="description" content="' + desc + '">'
         '<meta name="theme-color" content="#0b3a4f">'
+        '<link rel="canonical" href="' + site + '">'
         '<meta property="og:type" content="website">'
-        '<meta property="og:title" content="Ballet l Ba7er">'
+        '<meta property="og:site_name" content="Ballet l Ba7er">'
+        '<meta property="og:title" content="' + og_title + '">'
+        '<meta property="og:url" content="' + site + '">'
         '<meta property="og:description" content="' + desc + '">'
+        '<meta property="og:image" content="' + site + 'og-image.jpg">'
+        '<meta property="og:image:type" content="image/jpeg">'
+        '<meta property="og:image:width" content="1200">'
+        '<meta property="og:image:height" content="630">'
+        '<meta property="og:image:alt" content="Blue tiles laid out into the sea off the Saida corniche, with the title Ballet l Ba7er">'
         '<meta name="twitter:card" content="summary_large_image">'
+        '<meta name="twitter:title" content="' + og_title + '">'
+        '<meta name="twitter:description" content="' + desc + '">'
+        '<meta name="twitter:image" content="' + site + 'og-image.jpg">'
         '<link rel="icon" type="image/svg+xml" href="favicon.svg">'
         '<link rel="mask-icon" href="favicon.svg" color="#0b3a4f">'
         + HEAD_RESET)
@@ -81,6 +95,10 @@ if os.path.exists(THREE_SRC):
         if os.path.exists(name):
             io.open(os.path.join('docs', name), 'w', encoding='utf-8').write(
                 io.open(name, encoding='utf-8').read())
+    # the link-preview image (binary: copied byte for byte)
+    if os.path.exists('brand/og-image.jpg'):
+        with open('brand/og-image.jpg', 'rb') as src, open('docs/og-image.jpg', 'wb') as dst:
+            dst.write(src.read())
     for stale in ('docs/cms.html', 'docs/ads.js'):
         if os.path.exists(stale):
             os.remove(stale)
