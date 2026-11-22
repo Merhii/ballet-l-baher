@@ -641,6 +641,22 @@
   // the second flight, centred on the old railing gap in front of the food court
   const SOUK_STAIR_X = 42.4;
 
+  /* Jazirat Ziri, off the corniche: a flat rock cap you can walk on, a jetty
+     on the side facing land (tile height), and steps along the face from the
+     jetty up to the cap. The boat runs from the Souk el Akel stairs. */
+  const ZIRI = {
+    x: 74, z: 98, hx: 13, hz: 9, top: 2.9,
+    jetty: { x1: 66, x2: 74, z1: 83, z2: 89 },
+    steps: { x1: 74, z1: 86.6, z2: 89, tread: 0.6, n: 11 }
+  };
+  // where the boatman stands at each end, and where the ride drops you off
+  const FERRY = {
+    souk: { man: { x: SOUK_STAIR_X - 3.4, y: 0.3, z: 2.2 }, drop: { x: SOUK_STAIR_X, y: 0.3, z: 2.0 },
+            boat: { x: SOUK_STAIR_X - 6.3, z: 4.2, ry: 0.1 } },
+    ziri: { man: { x: 67.6, y: 0.3, z: 84.4 }, drop: { x: 70.5, y: 0.3, z: 86.5 },
+            boat: { x: 63.6, z: 85.5, ry: 0.05 } }
+  };
+
   function buildCorniche() {
     const C0 = W.COL, rng = mulberry(7001);
     const mPave = new Mesher(), mMas = new Mesher(), mFlat = new Mesher();
@@ -938,23 +954,97 @@
     const mf = new Mesher();    // concrete, timber, paint
     const mg = new Mesher();    // the beacon lamp (swapped at night)
 
-    /* ---- Jazirat Ziri: low, flat, scrubby. Reads as a line, not a tower. -- */
-    const ISL = { x: 74, z: 98 };
+    /* ---- Jazirat Ziri: low, flat, scrubby, and you can land on it. -------
+       A flat cap of rock (ZIRI.top) square to the world axes, so its one
+       collider matches what you see; it flares out only under the water.
+       On the side facing the corniche: a concrete jetty at tile height,
+       where the boat comes in, and a flight of steps along the rock face up
+       to the cap. */
+    const ISL = ZIRI;
+    const HX = ISL.hx, HZ = ISL.hz, TOP = ISL.top;
+    const tWater = 2.6 / (TOP + 2.6);
     strataStack(m, {
-      rng: rng, baseY: -2.6, topY: 5.6, layerH: 0.8, notch: 0.55,
-      ox: ISL.x, oz: ISL.z, rot: 0.32,
-      hx: function (t) { return 16.5 - t * 6.5; },
-      hz: function (t) { return 11.5 - t * 4.6; }
+      rng: rng, baseY: -2.6, topY: TOP, layerH: 0.8, notch: 0.3,
+      ox: ISL.x, oz: ISL.z, rot: 0,
+      hx: function (t) { return t < tWater ? HX + 2.5 * (1 - t / tWater) : HX; },
+      hz: function (t) { return t < tWater ? HZ + 2.0 * (1 - t / tWater) : HZ; }
     });
+    coll(ISL.x - HX, ISL.z - HZ, ISL.x + HX, ISL.z + HZ, TOP);
     // dry scrub and gull mess on the cap
-    for (let i = 0; i < 16; i++) {
-      const a = rng() * TAU, rr = rng() * 8.5;
-      const sx = ISL.x + Math.cos(a) * rr, sz = ISL.z + Math.sin(a) * rr * 0.72;
-      mf.box(vary(mixc(C0.PALM_GREEN, C0.LIMESTONE, 0.55, c), rng, 0.18, c),
-        sx, 5.72 + rng() * 0.2, sz, 0.8 + rng() * 1.5, 0.22, 0.7 + rng() * 1.2,
-        0, rng() * TAU, 0);
+    for (let i = 0; i < 26; i++) {
+      const sx = ISL.x + (rng() - 0.5) * (HX * 2 - 3), sz = ISL.z + (rng() - 0.5) * (HZ * 2 - 3);
+      const w = 0.6 + rng() * 1.1, d = 0.5 + rng() * 0.9, h = 0.25 + rng() * 0.3;
+      // a low clump of dry bush: a darker base and a lighter, smaller top
+      mf.box(vary(mixc(C0.PALM_GREEN, C0.TRUNK, 0.3, c), rng, 0.2, c),
+        sx, TOP + h * 0.5, sz, w, h, d, 0, rng() * TAU, 0);
+      mf.box(vary(mixc(C0.PALM_LIGHT, C0.LIMESTONE, 0.25, c), rng, 0.2, c),
+        sx + (rng() - 0.5) * 0.2, TOP + h + 0.08, sz + (rng() - 0.5) * 0.2, w * 0.6, 0.18, d * 0.6, 0, rng() * TAU, 0);
     }
-    coll(ISL.x - 16, ISL.z - 11, ISL.x + 16, ISL.z + 11, 5.7);
+    // the jetty: poured concrete at tile height, on the corniche side
+    const J = ISL.jetty;
+    mf.box(mixc(C0.CEMENT, C0.LIMESTONE, 0.3, c), (J.x1 + J.x2) / 2, -0.6, (J.z1 + J.z2) / 2,
+      J.x2 - J.x1, 1.8, J.z2 - J.z1);
+    mf.box(mixc(C0.STONE_WET, C0.PALM_GREEN, 0.3, c), (J.x1 + J.x2) / 2, 0.306, J.z1 + 0.6,
+      J.x2 - J.x1 - 0.3, 0.012, 0.9);                                    // the wet lip
+    coll(J.x1, J.z1, J.x2, J.z2, 0.3);
+    // a mooring ring and a bollard for the boat
+    mf.prim(PRIM.torus, mixc(C0.RUST, C0.NIGHT_TOP, 0.3, c), J.x1 + 1.0, 0.42, J.z1 + 0.4, 0.6, 0.6, 0.6, 0, 0, Math.PI * 0.5);
+    mf.prim(PRIM.cyl8, mixc(C0.LIMESTONE, C0.CEMENT, 0.3, c), J.x1 + 0.9, 0.62, J.z2 - 1.0, 0.5, 0.64, 0.5);
+    coll(J.x1 + 0.6, J.z2 - 1.3, J.x1 + 1.2, J.z2 - 0.7, 0.95);
+    // steps along the rock face, from the jetty up to the cap
+    const S0 = ISL.steps, n = S0.n, rise = (TOP - 0.3) / n;
+    for (let s = 0; s < n; s++) {
+      const x1 = S0.x1 + s * S0.tread, top = 0.3 + (s + 1) * rise;
+      vary(mixc(C0.CEMENT, C0.LIMESTONE, 0.45, c), rng, 0.05, c);
+      mf.box(c, x1 + S0.tread / 2, (top - 1.2) / 2, (S0.z1 + S0.z2) / 2, S0.tread, top + 1.2, S0.z2 - S0.z1);
+      coll(x1, S0.z1, x1 + S0.tread, S0.z2, top);
+    }
+    const LX1 = S0.x1 + n * S0.tread, LX2 = LX1 + 3;
+    mf.box(mixc(C0.CEMENT, C0.LIMESTONE, 0.45, c), (LX1 + LX2) / 2, (TOP - 1.2) / 2, (S0.z1 + S0.z2) / 2,
+      LX2 - LX1, TOP + 1.2, S0.z2 - S0.z1);                              // the landing at the top
+    coll(LX1, S0.z1, LX2, S0.z2, TOP);
+    // a rusty handrail on the open side of the steps
+    for (let s = 0; s <= n; s += 2) {
+      const x = S0.x1 + s * S0.tread + 0.1, y = 0.3 + s * rise;
+      mf.rod(vary(C0.RUST, rng, 0.2, c), x, y, S0.z1 + 0.12, x, y + 0.95, S0.z1 + 0.12, 0.05, PRIM.cyl6);
+    }
+    mf.rod(mixc(C0.RUST, C0.CEMENT, 0.25, c), S0.x1 + 0.1, 1.25, S0.z1 + 0.12,
+      S0.x1 + n * S0.tread + 0.1, TOP + 0.95, S0.z1 + 0.12, 0.045, PRIM.cyl6);
+    // a fishermen's shade: four poles and a sheet of corrugated tin
+    const SX = ISL.x - 6, SZ = ISL.z + 2;
+    for (let k = 0; k < 4; k++) {
+      const px = SX + (k % 2 ? 1.6 : -1.6), pz = SZ + (k < 2 ? -1.2 : 1.2);
+      mf.rod(mixc(C0.TRUNK, C0.CEMENT, 0.3, c), px, TOP, pz, px, TOP + 2.2 + (k < 2 ? 0.15 : 0), pz, 0.06, PRIM.cyl6);
+      coll(px - 0.1, pz - 0.1, px + 0.1, pz + 0.1, TOP + 2.3);
+    }
+    mf.box(mixc(C0.CEMENT, C0.RUST, 0.3, c), SX, TOP + 2.32, SZ, 3.8, 0.06, 3.0, 0.07, 0.05, 0);
+    // plastic chairs under it, and one facing the castle
+    const ZCH = [[SX - 0.7, SZ - 0.3, 2.6], [SX + 0.8, SZ + 0.2, 3.4], [ISL.x + 7, ISL.z - 4, 3.9]];
+    for (let k = 0; k < ZCH.length; k++) {
+      chairMesher(mf, k === 1 ? C0.FOAM : mixc(C0.SEA_SHALLOW, C0.FOAM, 0.2, c), ZCH[k][0], TOP, ZCH[k][1], ZCH[k][2], 0);
+      coll(ZCH[k][0] - 0.3, ZCH[k][1] - 0.3, ZCH[k][0] + 0.3, ZCH[k][1] + 0.3, TOP + 0.45);
+    }
+    // a cool box someone forgot
+    mf.box(mixc(C0.SEA_MID, C0.FOAM, 0.3, c), SX + 0.2, TOP + 0.22, SZ + 1.0, 0.7, 0.44, 0.45, 0, 0.3, 0);
+    mf.box(C0.FOAM, SX + 0.2, TOP + 0.46, SZ + 1.0, 0.74, 0.06, 0.49, 0, 0.3, 0);
+    // a hand-painted sign at the top of the steps, facing the corniche
+    const ZSX = LX2 + 1.8, ZSZ = ISL.z - HZ + 0.9;      // beside the top of the steps, not in the way
+    mf.prim(PRIM.cyl8, mixc(C0.TRUNK, C0.CEMENT, 0.3, c), ZSX - 1.1, TOP + 0.95, ZSZ, 0.12, 1.9, 0.12);
+    mf.prim(PRIM.cyl8, mixc(C0.TRUNK, C0.CEMENT, 0.3, c), ZSX + 1.1, TOP + 0.95, ZSZ, 0.12, 1.9, 0.12);
+    coll(ZSX - 1.3, ZSZ - 0.2, ZSX + 1.3, ZSZ + 0.2, TOP + 1.9);
+    const zMat = new T.MeshBasicMaterial({
+      map: texShopSign({ w: 1024, h: 256, ar: 'جزيرة زيري', sub: 'JAZIRAT ZIRI',
+                     bg: '#EDF6F3', fg: '#0B3A4F', border: 'rgba(11,58,79,0.6)' })
+    });
+    W.mats.push(zMat);
+    const zGeo = new T.PlaneGeometry(2.6, 0.72);
+    W.geos.push(zGeo);
+    const zSign = new T.Mesh(zGeo, zMat);
+    zSign.name = 'ziriSign';
+    zSign.position.set(ZSX, TOP + 1.45, ZSZ - 0.08);
+    zSign.rotation.y = Math.PI;          // read from the steps and from the corniche
+    zSign.rotation.z = -0.03;
+    g.add(zSign);
 
     /* ---- the harbour mole: tumbled blocks out from the castle side, the
             way every Lebanese fishing port is held together. ---------------- */
@@ -1024,7 +1114,7 @@
     for (let i = 0; i < 4; i++) {
       const a = rng() * TAU, rr = 3 + rng() * 7;
       W.perches.push({
-        x: ISL.x + Math.cos(a) * rr, y: 5.9,
+        x: ISL.x + Math.cos(a) * rr, y: ZIRI.top + 0.25,
         z: ISL.z + Math.sin(a) * rr * 0.72, ry: rng() * TAU
       });
     }
@@ -2205,6 +2295,17 @@
       W.group.add(mesh);
       W.floaters.push({ mesh: mesh, x: s.x, z: s.z, ry: s.ry, amp: s.amp, span: 2.6, phase: i * 1.7 });
     }
+    // the Ziri boat, waiting at each end of the run (the ride itself is a fade)
+    const g3 = boatGeo(2103, 5.6, 2.0, '#2E7FA8', '#EDF6F3', false);
+    ['souk', 'ziri'].forEach(function (end, k) {
+      const s = FERRY[end].boat;
+      const mesh = new T.Mesh(g3, W.MAT.flat);
+      mesh.position.set(s.x, 0, s.z);
+      mesh.rotation.y = s.ry;
+      mesh.name = 'ferry-' + end;
+      W.group.add(mesh);
+      W.floaters.push({ mesh: mesh, x: s.x, z: s.z, ry: s.ry, amp: 0.8, span: 2.2, phase: 2.3 + k });
+    });
     // the banana-yellow jet ski, tied up at the foot of the stairs
     const jm = new Mesher();
     const yellow = mixc(C0.SUN, C0.HAZARD, 0.4, new T.Color());
@@ -2684,7 +2785,7 @@
     W.ridges = buildMountains();
     buildCorniche();
     buildBalustrade();
-    buildSaidaOffshore();
+    W.group.add(buildSaidaOffshore());     // Ziri, the harbour mole and its beacon
     buildCastle();
     buildCauseway();
     buildTrees();
@@ -2940,6 +3041,10 @@
       stairs: [0, SOUK_STAIR_X].reduce(function (all, cx) {
         return all.concat(STAIR.map(function (s) { return { top: s.top, z1: s.z1, z2: s.z2, x1: cx - 5, x2: cx + 5 }; }));
       }, []),
+      // Jazirat Ziri: where you can stand, and the boat between it and the souk stairs
+      ziri: { x: ZIRI.x, z: ZIRI.z, top: ZIRI.top,
+              x1: ZIRI.x - ZIRI.hx, x2: ZIRI.x + ZIRI.hx, z1: ZIRI.jetty.z1, z2: ZIRI.z + ZIRI.hz },
+      ferry: FERRY,
       setLightsEnabled: function (on) { lights.visible = !!on; }
     };
     setTimeOfDay(0.18);

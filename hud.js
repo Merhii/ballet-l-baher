@@ -1536,6 +1536,10 @@
           'and bouza, which cools you down), Soubras (sandwiches that keep healing you) and ' +
           'Falafel Akkawi. Knefe Jardali is west of the stairs. Walk up to a counter and press ' +
           K('E') + '. Sahet el Qal3a by the castle opens soon.</p>' +
+          '<h4>Jazirat Ziri</h4>' +
+          '<p>The island off the corniche. Abou Ali waits with his boat at the foot of the Souk el Akel ' +
+          'stairs and takes you out for 10 lira; his son Ali brings you back for free. Or swim, if you ' +
+          'have the stamina.</p>' +
           '<h4>Controls</h4><div class="keys">' +
           '<div>' + K('WASD') + ' walk</div><div>' + K('SHIFT') + ' run</div>' +
           '<div>' + K('SPACE') + ' jump</div><div>' + K('CLICK') + ' lay a balata</div>' +

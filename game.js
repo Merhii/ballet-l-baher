@@ -1159,6 +1159,12 @@
     var lastPlace = 0;
     function cellValidity(i, j, tierIdx, checkReach) {
       if (i < -64 || i > 64 || j < 0 || j > 400) return 'out of the works';
+      // Jazirat Ziri is already land: no tiling over the rock or the jetty
+      var zr = world.ziri;
+      if (zr) {
+        var zx = cellCentreX(i), zz = cellCentreZ(j);
+        if (zx > zr.x1 - 1 && zx < zr.x2 + 1 && zz > zr.z1 - 1 && zz < zr.z2 + 1) return 'that is Ziri — already land';
+      }
       if (sim.get(i, j)) return 'already tiled';
       if (!sim.isSupported(i, j)) return 'nothing to rest it on';
       if (S.mortar < TIERS[tierIdx].mortar) return 'no mouna left';
@@ -1227,7 +1233,7 @@
       // whoever is closer wins the E key
       if (tTalk) {
         var tShow = (who || board) ? 'block' : 'none';
-        var tText = board ? 'OPEN AD' : (who && who.npc.def.sells ? 'BUY' : 'TALK');
+        var tText = board ? 'OPEN AD' : (who && who.npc.def.sells ? 'BUY' : (who && who.npc.def.ferryTo ? 'BOAT' : 'TALK'));
         // written only when they change: this runs every frame on a phone
         if (tTalk.style.display !== tShow) tTalk.style.display = tShow;
         if (tTalk.textContent !== tText) tTalk.textContent = tText;
@@ -1241,7 +1247,8 @@
         var food = who.npc.def.sells && FOODS[who.npc.def.sells];
         var label = food
           ? food.name.toLowerCase() + ' · ' + food.price + ' l.l.'
-          : 'talk to ' + who.npc.def.name;
+          : (who.npc.def.ferryTo === 'ziri' ? 'boat to Jazirat Ziri · ' + FERRY_PRICE + ' l.l.'
+            : (who.npc.def.ferryTo ? 'boat back to the corniche · free' : 'talk to ' + who.npc.def.name));
         hud.setPrompt(IS_TOUCH ? label : 'E — ' + label);
       } else if (pile && keys.KeyE) {
         if (S.mortar >= S.mortarMax) {
@@ -1450,6 +1457,44 @@
       }
     ];
 
+    /* The boat to Jazirat Ziri: Abou Ali waits at the foot of the Souk el Akel
+       stairs and takes you out for a few lira; his son Ali waits on the Ziri
+       jetty and brings you back for nothing. Invented people, like the rest of
+       the corniche regulars. */
+    var FERRY_PRICE = 10;
+    var ferry = world.ferry || null;
+    if (ferry && world.ziri) {
+      NPC_DEFS.push({
+        id: 'ferry-souk', name: 'Abou Ali', voice: 0, hat: 'cap', scale: 1.02,
+        shirt: 0x3fa8b4, hatCol: 0xedf6f3, yaw: Math.PI, ferryTo: 'ziri',
+        at: function () { return ferry.souk.man; },
+        lines: {
+          greet: [{ t: 'Ziri? 3ashr lira, w berja3ak b balash.', ar: 'عالجزيرة؟' }],
+          idle: [
+            { t: 'El ba7er hédi lyom. Yalla 3a Ziri?', ar: 'البحر هادي' },
+            { t: 'Hal flouké 3amra a2dam menni.', ar: 'الفلوكة أقدم مني' },
+            { t: 'Ballet la Ziri iza fik. Ana bestanna.', ar: 'أنا بستنّى' }
+          ],
+          ride: [{ t: 'Yalla, tla3. Mesek 7alak.', ar: 'يلا طلاع' }],
+          pricey: [{ t: '3ashr lira ya m3allem. El mazout mish balash.', ar: 'المازوت مش ببلاش' }]
+        }
+      });
+      NPC_DEFS.push({
+        id: 'ferry-ziri', name: 'Ali', voice: 2, hat: 'none', scale: 0.98,
+        shirt: 0xf2b733, hatCol: 0x2b2420, yaw: 0, ferryTo: 'souk',
+        at: function () { return ferry.ziri.man; },
+        lines: {
+          greet: [{ t: 'Ahla bi Ziri. Badak terja3? Bayyi 2al b balash.', ar: 'أهلا بزيري' }],
+          idle: [
+            { t: 'Men hon, el corniche bayyin kello.', ar: 'الكورنيش كلّو' },
+            { t: 'Bel sayf, el 3alam btesba7 la hon.', ar: 'بالصيف' },
+            { t: 'Ma fi shi hon. W hayde el 7elwe.', ar: 'وهيدي الحلوة' }
+          ],
+          ride: [{ t: 'Yalla, rje3na. Mesek 7alak.', ar: 'يلا رجعنا' }]
+        }
+      });
+    }
+
     // the food-court vendors, one behind each counter the world built
     (world.foodCourts || []).forEach(function (court) {
       (court.stalls || []).forEach(function (stall) {
@@ -1580,7 +1625,51 @@
       return true;
     }
 
+    /* The ride: a short fade while the boat crosses, then you are standing on
+       the other jetty, facing where you are going. Out costs FERRY_PRICE. */
+    var fadeEl = null, ferrying = false;
+    function fadeTo(on, ms) {
+      if (!fadeEl) {
+        fadeEl = document.createElement('div');
+        fadeEl.style.cssText = 'position:fixed;inset:0;z-index:70;background:#0b3a4f;opacity:0;' +
+          'pointer-events:none;transition:opacity .45s ease';
+        document.body.appendChild(fadeEl);
+      }
+      fadeEl.style.transitionDuration = (ms || 450) + 'ms';
+      fadeEl.style.opacity = on ? '1' : '0';
+    }
+    function ferryRide(npc) {
+      if (ferrying || !ferry) return true;
+      var to = npc.def.ferryTo, paid = to === 'ziri';
+      if (paid && S.lira < FERRY_PRICE) {
+        if (!npcSay(npc, 'pricey')) npcSay(npc, 'idle');
+        sfx.ui();
+        return true;
+      }
+      if (paid) { S.lira -= FERRY_PRICE; pushStats(); }
+      npcSay(npc, 'ride');
+      sfx.purchase();
+      ferrying = true;
+      keys = {}; placing = false;
+      touch.moveX = touch.moveZ = 0;
+      fadeTo(true, 450);
+      setTimeout(function () {
+        var d = ferry[to].drop;
+        body.teleport(d.x, d.y, d.z);
+        body.vel.set(0, 0, 0);
+        cam.yaw = to === 'ziri' ? Math.PI : 0;     // the island ahead, or the corniche
+        cam.pitch = -0.05;
+        if (sfx.splash) sfx.splash();
+        hud.toast(to === 'ziri'
+          ? 'Jazirat Ziri. Ali brings you back for free.' + (paid ? ' −' + FERRY_PRICE + ' l.l.' : '')
+          : 'Back at the Souk el Akel stairs.', 'info');
+        setTimeout(function () { fadeTo(false, 600); ferrying = false; }, 350);
+      }, 650);
+      return true;
+    }
+
     function talkTo(npc) {
+      if (npc.def.ferryTo) return ferryRide(npc);
       if (npc.def.sells) return buyFood(npc);
       var pool = npc.def.talk;
       if (!pool || !pool.length) return;
@@ -2053,7 +2142,8 @@
       { id: 'knefe',  name: 'Knefe addict',     ar: 'كنافة',       how: 'Eat 10 knefe at Jardali', goal: 10 },
       { id: 'faint',  name: 'Ghme 3alé',        ar: 'غمي عليه',    how: 'Pass out for the first time' },
       { id: 'wall',   name: 'Ma fi chi',        ar: 'ما في شي',    how: 'Climb the sea wall out of the water' },
-      { id: 'night',  name: 'Bel lél',          ar: 'بالليل',      how: 'Lay a tile at night' }
+      { id: 'night',  name: 'Bel lél',          ar: 'بالليل',      how: 'Lay a tile at night' },
+      { id: 'ziri',   name: 'Wselna 3al jazira', ar: 'وصلنا عالجزيرة', how: 'Set foot on Jazirat Ziri' }
     ];
     var ACH_KEY = 'blb.ach';
     var ach = { got: {}, n: { mouna: 0, knefe: 0 }, ate: {} };
@@ -2406,6 +2496,10 @@
       }
       // out of the sea straight up the wall onto the corniche, not the stairs
       if (body.leftWaterThisStep && body.pos.y > DECK_Y - 0.1) achieve('wall');
+      // standing on Jazirat Ziri (the jetty counts), however you got there
+      var zi = world.ziri;
+      if (zi && body.grounded && !body.inWater && body.pos.y > 0.2 &&
+          body.pos.x > zi.x1 && body.pos.x < zi.x2 && body.pos.z > zi.z1 && body.pos.z < zi.z2) achieve('ziri');
       S.wasInWater = body.inWater;
 
       // stamina drains by what you are actually doing
