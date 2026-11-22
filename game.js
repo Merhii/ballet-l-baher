@@ -1189,6 +1189,10 @@
       S.laid++;
       tiles.add(cellTmp.i, cellTmp.j, 0);
       noteBest();
+      achieve('first');
+      if (S.phase === 'night') achieve('night');
+      if (sim.count * 4 >= 100) achieve('m100');
+      if (sim.count * 4 >= 400) achieve('m400');
       sfx.clack();
       fx.burst(cellCentreX(cellTmp.i), TILE_TOP, cellCentreZ(cellTmp.j), 0.55);
       mason.state.lay = 1;
@@ -1243,7 +1247,9 @@
         if (S.mortar >= S.mortarMax) {
           hud.setPrompt('barrow full — go tile the sea');
         } else {
+          var before = S.mortar;
           S.mortar = Math.min(S.mortarMax, S.mortar + dt * 7.5);
+          achCount('mouna', S.mortar - before);
           digging = true;
           digTimer -= dt;
           if (digTimer <= 0) {
@@ -1536,6 +1542,7 @@
       S.hp = clamp(S.hp + food.hp, 0, HP_MAX);
       if (food.buff) S.buffs[food.buff.id] = food.buff.t;
       S.knefeEaten++;
+      achAte(food);
       sfx.purchase();
       pushStats();
     }
@@ -1878,6 +1885,7 @@
       if (S.fainted) return;
       S.fainted = 4.2;
       S.faints++;
+      achieve('faint');
       placing = false; keys = {};
       var bill = Math.min(Math.floor(S.lira), 20 + Math.round(S.lira * 0.15));
       S.lira -= bill;
@@ -2032,6 +2040,78 @@
         url: url
       };
     }
+
+    /* Achievements: small goals, kept in this browser apart from the save
+       (like the best), so a new game keeps them. Each unlocks once, with a
+       stamped toast; the menu has a page listing them all. */
+    var ACHIEVEMENTS = [
+      { id: 'first',  name: 'Awwal balata',     ar: 'أوّل بلاطة',  how: 'Lay your first tile' },
+      { id: 'mouna',  name: 'Mouna man',        ar: 'رجّال المونة', how: 'Shovel 100 mouna', goal: 100 },
+      { id: 'm100',   name: 'Nos el ba7er',     ar: 'نص البحر',    how: 'Have 100 m² standing at once' },
+      { id: 'm400',   name: 'Ballatt el ba7er', ar: 'بلّطت البحر',  how: 'Have 400 m² standing at once' },
+      { id: 'souk',   name: 'Tour de Souk',     ar: 'سوق الأكل',   how: 'Eat at all three stalls in Souk el Akel', goal: 3 },
+      { id: 'knefe',  name: 'Knefe addict',     ar: 'كنافة',       how: 'Eat 10 knefe at Jardali', goal: 10 },
+      { id: 'faint',  name: 'Ghme 3alé',        ar: 'غمي عليه',    how: 'Pass out for the first time' },
+      { id: 'wall',   name: 'Ma fi chi',        ar: 'ما في شي',    how: 'Climb the sea wall out of the water' },
+      { id: 'night',  name: 'Bel lél',          ar: 'بالليل',      how: 'Lay a tile at night' }
+    ];
+    var ACH_KEY = 'blb.ach';
+    var ach = { got: {}, n: { mouna: 0, knefe: 0 }, ate: {} };
+    try {
+      var rawAch = JSON.parse(localStorage.getItem(ACH_KEY) || 'null');
+      if (rawAch && typeof rawAch === 'object') {
+        if (rawAch.got && typeof rawAch.got === 'object') ach.got = rawAch.got;
+        if (rawAch.n) { ach.n.mouna = +rawAch.n.mouna || 0; ach.n.knefe = +rawAch.n.knefe || 0; }
+        if (rawAch.ate && typeof rawAch.ate === 'object') ach.ate = rawAch.ate;
+      }
+    } catch (e) { /* private window */ }
+    var achDirty = false;
+    function saveAch() {
+      if (!achDirty) return;
+      achDirty = false;
+      try { localStorage.setItem(ACH_KEY, JSON.stringify(ach)); } catch (e) { /* ignore */ }
+    }
+    function achById(id) {
+      for (var i = 0; i < ACHIEVEMENTS.length; i++) if (ACHIEVEMENTS[i].id === id) return ACHIEVEMENTS[i];
+      return null;
+    }
+    function achieve(id) {
+      if (ach.got[id] || !S.started) return;
+      var a = achById(id);
+      if (!a) return;
+      ach.got[id] = Date.now();
+      achDirty = true; saveAch();
+      if (hud.achievement) hud.achievement({ name: a.name, ar: a.ar, how: a.how });
+      else hud.toast('Achievement: ' + a.name, 'good');
+      if (sfx.purchase) sfx.purchase();
+      pushAch();
+    }
+    function achCount(kind, amount) {
+      if (!(amount > 0)) return;
+      ach.n[kind] = (ach.n[kind] || 0) + amount;
+      achDirty = true;                    // written with the autosave, not every frame
+      var a = achById(kind);
+      if (a && a.goal && ach.n[kind] >= a.goal) achieve(kind);
+    }
+    function achAte(food) {
+      var key = null;
+      for (var k in FOODS) if (FOODS.hasOwnProperty(k) && FOODS[k] === food) key = k;
+      if (!key) return;
+      if (key === 'knefe') { achCount('knefe', 1); saveAch(); return; }
+      if (!ach.ate[key]) { ach.ate[key] = 1; achDirty = true; }
+      saveAch();
+      if (ach.ate.samra && ach.ate.soubras && ach.ate.akkawi) achieve('souk');
+    }
+    // what the menu page shows: every achievement, done or not, with progress
+    function achList() {
+      var nAte = (ach.ate.samra ? 1 : 0) + (ach.ate.soubras ? 1 : 0) + (ach.ate.akkawi ? 1 : 0);
+      return ACHIEVEMENTS.map(function (a) {
+        var have = a.id === 'souk' ? nAte : (a.goal ? Math.floor(ach.n[a.id] || 0) : 0);
+        return { id: a.id, name: a.name, ar: a.ar, how: a.how, done: !!ach.got[a.id],
+                 progress: a.goal && !ach.got[a.id] ? Math.min(have, a.goal) + ' / ' + a.goal : '' };
+      });
+    }
+    function pushAch() { if (hud.setAchievements) hud.setAchievements(achList()); }
     function pause() {
       if (!S.started || paused) return;
       paused = true;
@@ -2122,7 +2202,7 @@
     }
     function save() {
       try { localStorage.setItem(SAVE_KEY, JSON.stringify(serialize())); } catch (e) { /* private window */ }
-      noteBest(); saveBest();
+      noteBest(); saveBest(); saveAch();
     }
     function applySave(d) {
       if (!d || d.v !== 4) return false;
@@ -2160,6 +2240,7 @@
     hasSave = restored && (S.laid > 0 || sim.count > 5 || S.lira > 0);
     pushStats();
     setView(firstPerson, true);
+    pushAch();
     showMainMenu();
 
     var startedOnce = false;
@@ -2323,6 +2404,8 @@
         S.health = Math.max(0, S.health - SOAK_HIT);
         pushStats();
       }
+      // out of the sea straight up the wall onto the corniche, not the stairs
+      if (body.leftWaterThisStep && body.pos.y > DECK_Y - 0.1) achieve('wall');
       S.wasInWater = body.inWater;
 
       // stamina drains by what you are actually doing
@@ -2451,7 +2534,8 @@
       tick: tick, npcSay: npcSay, npcEvent: npcEvent, sfx: sfx,
       damage: damage, pause: pause, resume: resume, onMenu: onMenu, boards: boards,
       settings: SET, foods: FOODS, adSource: function () { return adSource; },
-      best: function () { noteBest(); return { metres: best.metres, laid: best.laid }; }, share: shareInfo
+      best: function () { noteBest(); return { metres: best.metres, laid: best.laid }; }, share: shareInfo,
+      achievements: function () { return achList(); }
     };
   }
 

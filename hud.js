@@ -321,6 +321,27 @@
 '.blb-toast .tx{padding:6px 9px 7px;font-size:13px;font-weight:600;letter-spacing:.02em;}',
 '.blb-toast.good .bar{background:var(--blb-palm);}',
 '.blb-toast.bad .bar{background:var(--blb-terra);}',
+'.blb-toast.ach{border-color:var(--blb-haz);}',
+'.blb-toast.ach .bar{background:var(--blb-haz);}',
+'.blb-toast.ach .tx{display:grid;grid-template-columns:auto 1fr;column-gap:10px;row-gap:1px;align-items:center;text-align:left;}',
+'.blb-toast.ach .lb,.blb-toast.ach .nm,.blb-toast.ach small{grid-column:2;}',
+'.blb-toast.ach .st{grid-row:span 3;width:30px;height:30px;border-radius:50%;border:2px solid var(--blb-terra);',
+'  color:var(--blb-terra);display:grid;place-items:center;font-size:16px;transform:rotate(-12deg);}',
+'.blb-toast.ach .lb{font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;opacity:.65;}',
+'.blb-toast.ach b{font-size:15px;letter-spacing:.04em;}',
+'.blb-toast.ach .ar{font-family:var(--blb-artext);font-size:12px;opacity:.75;}',
+'.blb-toast.ach small{font-size:11px;font-weight:500;opacity:.7;}',
+'.blb-achs{display:grid;gap:6px;}',
+'.blb-ach{display:grid;grid-template-columns:34px 1fr auto;gap:10px;align-items:center;padding:7px 9px;',
+'  border:2px solid var(--blb-ink);background:rgba(255,255,255,.35);}',
+'.blb-ach .ic{width:30px;height:30px;border-radius:50%;border:2px dashed currentColor;display:grid;place-items:center;',
+'  font-size:15px;opacity:.45;}',
+'.blb-ach.done .ic{border:2px solid var(--blb-terra);color:var(--blb-terra);opacity:1;transform:rotate(-12deg);}',
+'.blb-ach .nm{font-size:14px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;}',
+'.blb-ach .nm .ar{font-family:var(--blb-artext);font-size:12px;font-weight:500;text-transform:none;opacity:.7;margin-left:6px;}',
+'.blb-ach .hw{font-size:11.5px;opacity:.7;}',
+'.blb-ach .pr{font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;opacity:.7;}',
+'.blb-ach:not(.done){opacity:.72;}',
 '.blb-toast.bad{border-color:var(--blb-rust);}',
 '.blb-toast.in{animation:blb-slap .26s cubic-bezier(.2,1.5,.4,1) both;}',
 '.blb-toast.out{opacity:0;transform:translateX(14px) rotate(-.4deg);',
@@ -828,6 +849,8 @@
 '  .blb-msheet h3{padding:7px 14px 5px;font-size:15px;} .blb-msheet h3 .ar{font-size:15px;}',
 '  .blb-msheet .bd{padding:6px 14px 0;font-size:12.5px;} .blb-msheet .bd h4{margin:8px 0 4px;}',
 '  .blb-set{padding:5px 0;gap:4px 10px;} .blb-set .k{font-size:12px;} .blb-set .k small{font-size:10.5px;}',
+'  .blb-achs{gap:4px;} .blb-ach{padding:4px 8px;gap:8px;grid-template-columns:26px 1fr auto;}',
+'  .blb-ach .ic{width:24px;height:24px;font-size:12px;} .blb-ach .nm{font-size:12.5px;} .blb-ach .hw{font-size:10.5px;}',
 '  .blb-set input[type=range]{width:130px;} .blb-seg button{padding:3px 8px 4px;font-size:11px;}',
 '  .blb-mback{margin:8px 14px 0;padding:5px 12px 6px;}',
 '}',
@@ -1450,6 +1473,7 @@
             MB('new', '02', 'Balle4 men jdid', 'new game — a fresh, untiled sea', 'جديد') +
             MB('howto', '03', 'Kif bteshtghel', 'how to play', 'كيف') +
             MB('settings', '04', 'E3dadat', 'settings', 'إعدادات') +
+            MB('ach', '05', 'Achievements', 'what you have done so far', 'إنجازات') +
             MB('credits', '05', 'Credits', 'who is to blame', 'مين') +
             MB('share', '06', 'Share', 'send your best to a friend', 'شارك') +
             MB('install', '07', 'Install', 'put the game on your home screen', 'نزّل') +
@@ -1477,10 +1501,18 @@
     const sheet = intro.querySelector('[data-sheet]');
     const elSum = intro.querySelector('[data-sum]');
     const menuBtns = {};
-    ['continue', 'resume', 'new', 'howto', 'settings', 'credits', 'share', 'install', 'quit'].forEach(function (a) {
+    ['continue', 'resume', 'new', 'howto', 'settings', 'ach', 'credits', 'share', 'install', 'quit'].forEach(function (a) {
       menuBtns[a] = intro.querySelector('[data-act="' + a + '"]');
     });
     let menuState = { mode: 'main', hasSave: false, summary: null, settings: {} };
+    let achs = [];        // the achievements page: [{ name, ar, how, done, progress }]
+    function paintAchBtn() {
+      const b = menuBtns.ach;
+      if (!b) return;
+      b.hidden = !achs.length;
+      const done = achs.filter(function (a) { return a.done; }).length;
+      b.querySelector('.s').textContent = done + ' of ' + achs.length + ' done';
+    }
     let sheetName = '';
 
     function openSheet(name) {
@@ -1555,6 +1587,16 @@
             'harbour mole? Email <a href="mailto:' + CONTACT.email + '?subject=' +
             encodeURIComponent('Billboard on Ballet l Ba7er') + '">' + CONTACT.email + '</a>.</p>' +
           '<p>The sea does not issue receipts.</p></div>' + back;
+      } else if (name === 'ach') {
+        const done = achs.filter(function (a) { return a.done; }).length;
+        html += '<h3>Achievements <span class="ar">إنجازات</span></h3><div class="bd">' +
+          '<p>' + done + ' of ' + achs.length + ' done. They stay with you, even after a new game.</p>' +
+          '<div class="blb-achs">' + achs.map(function (a) {
+            return '<div class="blb-ach' + (a.done ? ' done' : '') + '"><div class="ic">' + (a.done ? '✓' : '?') + '</div>' +
+              '<div><div class="nm">' + esc(a.name) + (a.ar ? '<span class="ar">' + esc(a.ar) + '</span>' : '') + '</div>' +
+              '<div class="hw">' + esc(a.how) + '</div></div>' +
+              '<div class="pr">' + (a.done ? '' : esc(a.progress || '')) + '</div></div>';
+          }).join('') + '</div></div>' + back;
       } else if (name === 'install') {
         html += '<h3>On your home screen <span class="ar">نزّل اللعبة</span></h3><div class="bd">' +
           (PWA.ios
@@ -1611,7 +1653,7 @@
       const b = e.target.closest ? e.target.closest('[data-act]') : null;
       if (!b || b.disabled) return;
       const act = b.getAttribute('data-act');
-      if (act === 'howto' || act === 'settings' || act === 'credits') {
+      if (act === 'howto' || act === 'settings' || act === 'credits' || act === 'ach') {
         openSheet(sheetName === act ? '' : act);
         return;
       }
@@ -1668,6 +1710,7 @@
       elSum.innerHTML = cells;
       // sharing is offered once there is a record worth bragging about
       menuBtns.share.hidden = !(s && s.share && s.share.metres > 0);
+      paintAchBtn();
       // install: on the published page, when not already running as the app,
       // and when the browser offers it (or on iOS, which never offers but can)
       menuBtns.install.hidden = !(PWA.enabled && PWA.mobile && !PWA.installed && (PWA.prompt || PWA.ios));
@@ -1859,6 +1902,24 @@
       const rec = { node: n, ttl: 3.1 + Math.min(2.2, String(text).length * 0.035), out: false };
       liveToasts.push(rec);
       // cap the stack so a burst of placements can't fill the screen
+      while (liveToasts.length > 5) {
+        const old = liveToasts.shift();
+        if (old.node.parentNode) old.node.parentNode.removeChild(old.node);
+      }
+      return rec;
+    }
+
+    // an achievement: a toast with a municipal stamp, held a little longer
+    function achievement(a) {
+      a = a || {};
+      const n = el('div', 'blb-plaque blb-toast ach in',
+        '<div class="bar"></div><div class="tx"><span class="st">✓</span>' +
+        '<span class="lb">Achievement</span><span class="nm"><b>' + esc(a.name || '') + '</b>' +
+        (a.ar ? ' <span class="ar">' + esc(a.ar) + '</span>' : '') + '</span>' +
+        '<small>' + esc(a.how || '') + '</small></div>');
+      toasts.appendChild(n);
+      const rec = { node: n, ttl: 5.5, out: false };
+      liveToasts.push(rec);
       while (liveToasts.length > 5) {
         const old = liveToasts.shift();
         if (old.node.parentNode) old.node.parentNode.removeChild(old.node);
@@ -2102,6 +2163,12 @@
       showMenu: showMenu,
       hideMenu: hideIntro,
       isMenuOpen: function () { return introOpen; },
+      achievement: achievement,
+      setAchievements: function (list) {
+        achs = Array.isArray(list) ? list : [];
+        paintAchBtn();
+        if (sheetName === 'ach') openSheet('ach');
+      },
       // new settings while the menu is up (the debug switch appearing): redraw an open sheet
       refreshSettings: function (o) {
         menuState.settings = Object.assign({}, menuState.settings, o || {});
