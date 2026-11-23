@@ -32,7 +32,7 @@ if (Test-Path $threeSrc) {
   if ($body.Contains('cdnjs')) { throw 'standalone build still references a CDN' }
   $desc = 'Tile the Mediterranean off the Saida corniche while the sea takes your edges back. A 3D browser game of the Lebanese saying.'
   # where the game lives: link previews need absolute URLs. Change here for a new domain.
-  $site = 'https://merhii.github.io/ballet-l-baher/'
+  $site = 'https://balletlba7er.com/'
   # "Ballet l Ba7er — بلّط البحر", spelled in code points: Windows PowerShell 5.1
   # reads a BOM-less script as ANSI and would garble literal Arabic here
   $ogTitle = 'Ballet l Ba7er ' + [char]0x2014 + ' ' + (-join [char[]](0x0628,0x0644,0x0651,0x0637,0x20,0x0627,0x0644,0x0628,0x062D,0x0631))
@@ -56,6 +56,8 @@ if (Test-Path $threeSrc) {
   Write-Text 'dist/standalone/index.html' $page
   Write-Text 'docs/index.html' $page
   Write-Text 'docs/.nojekyll' ''
+  # the custom domain GitHub Pages serves the game on, taken from $site
+  Write-Text 'docs/CNAME' (($site -replace '^https?://', '' -replace '/$', '') + "`n")
   foreach ($n in 'favicon.svg', 'logo-trowel.svg', 'manifest.webmanifest', 'sw.js') {
     if (Test-Path "brand/$n") { Write-Text "docs/$n" (Read-Text "brand/$n") }
   }

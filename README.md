@@ -6,7 +6,7 @@ A small 3D browser game set on the Saida corniche. In Lebanon, "ballet l ba7er"
 (go tile the sea) is what you tell someone to go do something pointless. Here
 you actually do it.
 
-**[Play it →](https://merhii.github.io/ballet-l-baher/)**
+**[Play it →](https://balletlba7er.com/)**
 
 ## Stack
 

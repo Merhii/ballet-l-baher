@@ -48,7 +48,7 @@ if os.path.exists(THREE_SRC):
     desc = ('Tile the Mediterranean off the Saida corniche while the sea takes '
             'your edges back. A 3D browser game of the Lebanese saying.')
     # where the game lives: link previews need absolute URLs. Change here for a new domain.
-    site = 'https://merhii.github.io/ballet-l-baher/'
+    site = 'https://balletlba7er.com/'
     og_title = u'Ballet l Ba7er — بلّط البحر'
     head = (
         '<meta charset="utf-8">'
@@ -91,6 +91,8 @@ if os.path.exists(THREE_SRC):
         os.makedirs('docs')
     io.open('docs/index.html', 'w', encoding='utf-8').write(page)
     io.open('docs/.nojekyll', 'w', encoding='utf-8').write('')
+    # the custom domain GitHub Pages serves the game on, taken from `site`
+    io.open('docs/CNAME', 'w', encoding='utf-8').write(site.split('//', 1)[1].strip('/') + '\n')
     for name in ('favicon.svg', 'logo-trowel.svg', 'manifest.webmanifest', 'sw.js'):
         src = os.path.join('brand', name)
         if os.path.exists(src):

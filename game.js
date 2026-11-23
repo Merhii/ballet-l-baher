@@ -2111,7 +2111,7 @@
       try { localStorage.setItem(BEST_KEY, JSON.stringify(best)); } catch (e) { /* ignore */ }
     }
     // the link people get: this page when it is on the web, else the public site
-    var SITE = 'https://merhii.github.io/ballet-l-baher/';
+    var SITE = 'https://balletlba7er.com/';
     function shareInfo() {
       var url = SITE;
       try {
