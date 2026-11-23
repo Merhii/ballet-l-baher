@@ -3421,7 +3421,9 @@
     const crownGeos = [buildPalmCrownGeo(71), buildPalmCrownGeo(72), buildPalmCrownGeo(73)];
     const xs = [-124, -108, -92, -60, -44, -30, -18, 20, 34, 50, 66, 84, 100, 118];
     for (let i = 0; i < xs.length; i++) {
-      const x = xs[i] + (rng() - 0.5) * 2.4, z = -10.5 + (rng() - 0.5) * 3.5;
+      const x = xs[i] + (rng() - 0.5) * 2.4;
+      let z = -10.5 + (rng() - 0.5) * 3.5;
+      if (xs[i] === -30) z = -14.6;       // set back, so it does not stand on Im Kamel's cart
       const h = 7.4 + rng() * 4.2;
       const lean = (rng() - 0.5) * 0.17, leanZ = (rng() - 0.5) * 0.12;
       // planter kerb + a ring of dry soil (contact darkening, no shadow maps)
@@ -3454,7 +3456,7 @@
       coll(x - 1.3, z - 1.3, x + 1.3, z + 1.3, 1.8);
     }
     // two ficus trees: chunky blobs, very municipal
-    const fic = [[-72, -16], [44, -18]];
+    const fic = [[-72, -16], [62, -21]];    // (the second used to stand among the Souk el Akel tables)
     for (let i = 0; i < fic.length; i++) {
       const x = fic[i][0], z = fic[i][1];
       trunks.prim(PRIM.cyl8, vary(C0.CEMENT, rng, 0.1, c), x, 1.58, z, 3.0, 0.24, 3.0, 0, 0, 0, 1 / 6);
@@ -3521,7 +3523,9 @@
     const benchGeo = bm.geo();
     const bxf = [];
     for (let i = 0; i < 16; i++) {
-      const x = -124 + i * 16.2 + (rng() - 0.5) * 3;
+      let x = -124 + i * 16.2 + (rng() - 0.5) * 3;
+      // keep a clear walk between a bench and a lamp post
+      for (let L = 0; L < lampXs.length; L++) if (Math.abs(x - lampXs[L]) < 2.4) x = lampXs[L] + (x < lampXs[L] ? -2.4 : 2.4);
       if (Math.abs(x) < 9) continue;
       const z = -6.6 + (rng() - 0.5) * 1.2;
       bxf.push(xf(x, 1.5, z, 1, 1, 1, 0, (rng() - 0.5) * 0.12, 0));
@@ -4098,12 +4102,14 @@
   function buildSandPiles() {
     const C0 = W.COL, rng = mulberry(9900), c = new T.Color();
     const m = new Mesher();
+    // spread over open paving, each with room to walk all the way round: clear
+    // of the kiosk, Knefe Jardali's counter, the benches, palms and the cart
     const piles = [
-      { x: -10.5, y: 1.5, z: -9.0, kind: 'sand' },
-      { x: 11.5, y: 1.5, z: -9.5, kind: 'gravel' },
-      { x: -17.0, y: 1.5, z: -15.5, kind: 'cement' },
-      { x: 18.5, y: 1.5, z: -17.0, kind: 'sand' },
-      { x: -22.5, y: 1.5, z: -7.5, kind: 'gravel' }
+      { x: -8.0, y: 1.5, z: -14.0, kind: 'sand' },
+      { x: 6.8, y: 1.5, z: -18.0, kind: 'gravel' },
+      { x: -13.0, y: 1.5, z: -21.0, kind: 'cement' },
+      { x: 24.0, y: 1.5, z: -19.0, kind: 'sand' },
+      { x: -28.0, y: 1.5, z: -19.0, kind: 'gravel' }
     ];
     for (let i = 0; i < piles.length; i++) {
       const p = piles[i];
@@ -4149,10 +4155,12 @@
     bake(m, W.MAT.rough, 'sandPiles');
     // a shovel left standing in the first pile, and a bucket
     const mf = new Mesher();
-    mf.rod(C0.TRUNK, -9.6, 1.6, -8.4, -10.3, 3.5, -9.1, 0.07, PRIM.cyl6);
-    mf.box(mixc(C0.CEMENT, C0.FOAM, 0.3, c), -9.45, 1.72, -8.25, 0.4, 0.5, 0.1, 0.35, 0.6, 0.2);
-    mf.prim(PRIM.cyl8, C(TIER_COLS[2]), 13.2, 1.68, -10.4, 0.62, 0.42, 0.62, 0, 0, 0.06);
-    mf.prim(PRIM.torus, shade(C(TIER_COLS[2]), -0.1, c), 13.2, 1.92, -10.4, 1.3, 1.3, 1.0, 0.2, 0, 0);
+    // (placed relative to their piles, so moving a pile takes its tools along)
+    const p0 = piles[0], p1 = piles[1];
+    mf.rod(C0.TRUNK, p0.x + 0.9, 1.6, p0.z + 0.6, p0.x + 0.2, 3.5, p0.z - 0.1, 0.07, PRIM.cyl6);
+    mf.box(mixc(C0.CEMENT, C0.FOAM, 0.3, c), p0.x + 1.05, 1.72, p0.z + 0.75, 0.4, 0.5, 0.1, 0.35, 0.6, 0.2);
+    mf.prim(PRIM.cyl8, C(TIER_COLS[2]), p1.x + 1.7, 1.68, p1.z - 0.9, 0.62, 0.42, 0.62, 0, 0, 0.06);
+    mf.prim(PRIM.torus, shade(C(TIER_COLS[2]), -0.1, c), p1.x + 1.7, 1.92, p1.z - 0.9, 1.3, 1.3, 1.0, 0.2, 0, 0);
     bake(mf, W.MAT.flat, 'tools');
     return piles;
   }
