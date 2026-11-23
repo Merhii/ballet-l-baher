@@ -23,8 +23,6 @@ art = shell.replace('__MODULES__', blob)
 io.open('dist/artifact.html', 'w', encoding='utf-8').write(art)
 # Mirror the reset the artifact host injects, so local.html behaves like the
 # published page rather than subtly differently.
-# Mirror the reset the artifact host injects, so local.html behaves like the
-# published page rather than subtly differently.
 HEAD_RESET = ('<style>:root{color-scheme:light}body{margin:0;'
               'font:14px system-ui,sans-serif;background:#faf9f7}'
               'img{max-width:100%}[hidden]{display:none!important}</style>')
