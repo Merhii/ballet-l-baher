@@ -353,9 +353,16 @@ check('BLB_HUD.create', () => {
   hud.setPrompt('hold E'); hud.setPrompt(null);
   hud.toast('hello', 'good'); hud.heckle('shu 3am ta3mel'); hud.setPhase('dusk');
   hud.showIntro(); hud.hideIntro(); hud.setLoading(50); hud.setLoading(null);
-  hud.openShop({ lira: 500, unlocked: [true, false, false, false], tiers: TIERS, mortarMax: 12,
-    barrowNext: { size: 20, cost: 60 }, workers: 0, workerNext: { cost: 250 }, floodlights: false, floodlightCost: 400 });
+  // the kiosk renders whatever the game prices: one row per item
+  hud.openShop({ lira: 100, items: [
+    { id: 'barrow', name: 'Bigger wheelbarrow', note: 'holds 20 → 30', price: 60, color: '#9aa0a0' },
+    { id: 'pouch', name: 'Food pouch', note: 'carries 3 snacks', price: 0, maxed: true },
+    { id: 'back', name: 'Stronger back', note: 'stamina 100 → 125', price: 200, disabled: true }
+  ] });
+  if (typeof hud.isShopOpen !== 'function' || !hud.isShopOpen()) throw new Error('kiosk did not open');
   hud.closeShop();
+  if (typeof hud.setPouch !== 'function') throw new Error('missing hud.setPouch');
+  hud.setPouch({ slots: 2, items: [{ id: 'knefe', name: 'Knefe b jebne' }] });
   hud.frame(0.016);
   return (HD.HECKLES ? HD.HECKLES.length + ' heckles' : 'no HECKLES export');
 });
@@ -385,7 +392,7 @@ check('sfx.say voice blips', () => {
 });
 check('BLB_HUD.createAudio', () => {
   sfx = HD.createAudio();
-  ['unlock', 'clack', 'pour', 'crumble', 'splash', 'gull', 'ui', 'purchase', 'wash']
+  ['unlock', 'clack', 'pour', 'crumble', 'splash', 'gull', 'ui', 'purchase', 'wash', 'hurt', 'thump']
     .forEach(k => { if (typeof sfx[k] !== 'function') throw new Error('missing sfx.' + k); });
   sfx.unlock();
   sfx.clack(); sfx.clack(); sfx.pour(); sfx.crumble(); sfx.splash(); sfx.gull(); sfx.ui(); sfx.purchase();

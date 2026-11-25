@@ -645,6 +645,12 @@
 '.blb-hp .heart{display:inline-block;width:10px;height:9px;margin-right:5px;vertical-align:-1px;',
 '  background:var(--blb-terra);clip-path:polygon(50% 100%,0 38%,0 12%,22% 0,50% 18%,78% 0,100% 12%,100% 38%);}',
 '@keyframes blb-throb{0%,100%{opacity:1}50%{opacity:.55}}',
+'.blb-pouch{display:flex;align-items:center;gap:5px;padding:4px 8px;}',
+'.blb-pouch .k{font-size:9.5px;font-weight:600;letter-spacing:.11em;text-transform:uppercase;',
+'  opacity:.72;margin-right:2px;}',
+'.blb-pouch .pip{min-width:18px;padding:2px 6px;font-size:10px;font-weight:700;text-align:center;',
+'  border:1.5px dashed rgba(11,58,79,.45);opacity:.6;}',
+'.blb-pouch .pip.on{border-style:solid;border-color:var(--blb-ink);background:var(--blb-haz);opacity:1;}',
 '.blb-buffs{display:flex;flex-wrap:wrap;gap:5px;}',
 '.blb-buff{padding:3px 7px 4px;font-size:10px;font-weight:700;letter-spacing:.1em;',
 '  text-transform:uppercase;background:var(--blb-ink);color:var(--blb-foam);',
@@ -815,6 +821,19 @@
 '  .blb-sea .hd{flex:1;} .blb-sea .nm{font-size:8px;letter-spacing:.03em;} .blb-sea .ar{font-size:8.5px;}',
 '  .blb-sea svg,.blb-sea .pips{display:none;}',
 '  .blb-buffs{grid-column:1 / -1;order:10;gap:3px;} .blb-buff{font-size:8px;padding:1px 4px 2px;}',
+'  .blb-pouch{grid-column:1 / -1;order:11;padding:2px 5px;gap:3px;} .blb-pouch .k{font-size:7.5px;}',
+'  .blb-pouch .pip{font-size:8px;padding:1px 4px;min-width:14px;}',
+/* the kiosk: one compact price list that fits a phone on its side */
+'  .blb-shop{padding:8px 10px;} .blb-kiosk{width:min(560px,100%);max-height:calc(100vh - 16px);}',
+'  .blb-kiosk:before,.blb-kiosk:after{display:none;} .blb-kiosk .cap{height:5px;}',
+'  .blb-khd{padding:6px 12px 5px;gap:8px;} .blb-khd h2{font-size:20px;} .blb-khd .sub{display:none;}',
+'  .blb-khd .purse{display:flex;align-items:center;gap:8px;} .blb-khd .purse .blb-lbl{display:none;}',
+'  .blb-khd .purse .v{font-size:17px;} .blb-close{padding:4px 9px 5px;font-size:10px;}',
+'  .blb-ksec{padding:5px 12px 2px;font-size:9.5px;} .blb-items{padding:0 12px 8px;gap:1px;}',
+'  .blb-item{grid-template-columns:20px minmax(0,1fr) auto auto;gap:8px;padding:4px 0;}',
+'  .blb-item .ic{width:20px;height:20px;} .blb-item .nm{font-size:12.5px;} .blb-item .no{font-size:10px;}',
+'  .blb-item .pr{font-size:13px;} .blb-buy{padding:4px 9px 5px;font-size:10.5px;}',
+'  .blb-kft{display:none;}',
 '  .blb-tr{top:6px;right:6px;gap:4px;} .blb-phase{font-size:7.5px;padding:2px 5px 3px;}',
 '  .blb-snd,.blb-menubtn{width:26px;height:22px;} .blb-snd svg,.blb-menubtn svg{width:13px;height:13px;}',
 '  .blb-toasts{top:34px;right:6px;width:min(210px,28vw);gap:3px;}',
@@ -1080,6 +1099,27 @@
       buffs.innerHTML = list.map(function (b) {
         return '<span class="blb-buff">' + esc(b.label) + '<b>' + Math.ceil(b.t) + 's</b></span>';
       }).join('');
+    }
+
+    // the food pouch: one pip per slot, filled with whatever you stashed
+    const pouch = el('div', 'blb-plaque blb-pouch');
+    pouch.style.display = 'none';
+    stats.appendChild(pouch);
+    let pouchKey = '';
+    function setPouch(o) {
+      o = o || {};
+      const slots = Math.max(0, num(o.slots, 0)), items = o.items || [];
+      const key = slots + ':' + items.map(function (i) { return i.id; }).join(',');
+      if (key === pouchKey) return;
+      pouchKey = key;
+      pouch.style.display = slots > 0 ? '' : 'none';
+      let h = '<span class="k">Pouch</span>';
+      for (let i = 0; i < slots; i++) {
+        const it = items[i];
+        h += '<span class="pip' + (it ? ' on' : '') + '" title="' + (it ? esc(it.name) : 'empty') + '">' +
+          (it ? esc(it.name.split(' ')[0]) : '·') + '</span>';
+      }
+      pouch.innerHTML = h;
     }
 
     // red edge when something hurts
@@ -1364,80 +1404,23 @@
       return h;
     }
 
+    /* The game owns the economy: it hands over `items` already priced, and a
+       Buy click goes straight back through onBuy(id). */
     function renderShop(st) {
       st = st || {};
-      const pr = lastPrices = st.prices || st.price || lastPrices || {};
       const lira = num(st.lira, S.lira);
-      const mortar = num(st.mortar, S.mortar);
-      const mortarMax = num(st.mortarMax, S.mortarMax);
-      const workers = num(st.workers, S.workers);
-      const maxWorkers = num(st.maxWorkers, 6);
-      const lvl = num(st.barrowLevel, num(st.barrow, 0));
-      const unl = st.unlocked != null ? normUnlocked(st.unlocked, tiers.length) : S.unlocked;
-
       elPurse.textContent = fmt(lira);
       shopBody.innerHTML = '';
-
-      shopBody.appendChild(shopSection('البلاط', 'Tile stock'));
-      const list1 = el('div', 'blb-items');
-      for (let i = 1; i < tiers.length; i++) {
-        const t = tiers[i], id = 'unlock:' + t.id, p = priceOf(id, pr);
-        list1.appendChild(shopItem({
-          id: id, color: t.color, price: p, owned: !!unl[i],
-          disabled: lira < p,
-          name: t.name + ' — ' + t.ar,
-          cta: 'Unlock',
-          note: 'hp ' + t.hp + ', ' + t.mortar + ' mouna and ' + fmt(t.lira) +
-                ' l.l. per balata'
-        }));
-      }
-      shopBody.appendChild(list1);
-
       shopBody.appendChild(shopSection('العدّة', 'The kit'));
-      const list2 = el('div', 'blb-items');
-      const pMortar = priceOf('mortar', pr);
-      list2.appendChild(shopItem({
-        id: 'mortar', color: pal.STONE_DARK, price: pMortar, disabled: lira < pMortar,
-        name: 'Sack of mouna', cta: 'Fill up',
-        note: 'fills the barrow to the brim. you are at ' + Math.round(mortar) +
-              ' of ' + Math.round(mortarMax)
-      }));
-      const pBarrow = priceOf('barrow', pr, PRICE.barrow * (lvl + 1));
-      list2.appendChild(shopItem({
-        id: 'barrow', color: pal.CEMENT, price: pBarrow, disabled: lira < pBarrow,
-        name: 'Bigger wheelbarrow', cta: 'Upgrade',
-        note: 'carry more mouna before the long walk back. barrow mk' + (lvl + 1)
-      }));
-      shopBody.appendChild(list2);
-
-      shopBody.appendChild(shopSection('الشغل بالليل', 'Night work'));
-      const list3 = el('div', 'blb-items');
-      const pFlood = priceOf('flood', pr, 600);
-      const hasFlood = !!st.floodlights;
-      list3.appendChild(shopItem({
-        id: 'flood', color: pal.HAZARD, price: pFlood,
-        owned: hasFlood, disabled: lira < pFlood,
-        name: 'Floodlights + mazout generator', cta: 'Rig it',
-        note: hasFlood
-          ? 'the corniche is lit. the neighbours have opinions.'
-          : 'work after maghreb. the generator is louder than the sea.'
-      }));
-      shopBody.appendChild(list3);
-
-      shopBody.appendChild(shopSection('الشباب', 'The shabeb'));
-      const list4 = el('div', 'blb-items');
-      const pShabeb = priceOf('shabeb', pr, PRICE.shabeb * (workers + 1));
-      list4.appendChild(shopItem({
-        id: 'shabeb', color: pal.SKIN, round: true, price: pShabeb,
-        disabled: lira < pShabeb || workers >= maxWorkers,
-        owned: workers >= maxWorkers,
-        name: 'Hire a shabeb', cta: 'Hire',
-        note: workers >= maxWorkers
-          ? 'that is the whole crew. the corniche is full.'
-          : 'he lays balat while you shovel. you have ' + workers +
-            (workers === 1 ? ' on site' : ' on site')
-      }));
-      shopBody.appendChild(list4);
+      const list = el('div', 'blb-items');
+      (st.items || []).forEach(function (it) {
+        list.appendChild(shopItem({
+          id: it.id, color: it.color || pal.CEMENT, price: num(it.price, 0),
+          owned: !!it.maxed, disabled: !!it.disabled,
+          name: it.name, note: it.note || '', cta: 'Upgrade'
+        }));
+      });
+      shopBody.appendChild(list);
     }
 
     /* ===================================================== intro title card */
@@ -1541,11 +1524,20 @@
           '<p>The island off the corniche. Abou Ali waits with his boat at the foot of the Souk el Akel ' +
           'stairs and takes you out for 10 lira; his son Ali brings you back for free. Or swim, if you ' +
           'have the stamina.</p>' +
+          '<h4>El Muallim\'s kiosk</h4>' +
+          '<p>El Muallim stands by the kiosk on the corniche. Press ' + K('E') + ' beside him for ' +
+          'upgrades: a bigger wheelbarrow (more mouna per trip), a better shovel, a stronger back ' +
+          '(more stamina, tires slower) and a food pouch. With a pouch, food you buy while full ' +
+          'goes in it; eat it anywhere with ' + K('Q') + '.</p>' +
+          '<h4>Manners</h4>' +
+          '<p>You can hit people with ' + K('F') + '. They will not like it: nobody sells to you or ' +
+          'helps you for a while, and the older men hit back.</p>' +
           '<h4>Controls</h4><div class="keys">' +
           '<div>' + K('WASD') + ' walk</div><div>' + K('SHIFT') + ' run</div>' +
           '<div>' + K('SPACE') + ' jump</div><div>' + K('CLICK') + ' lay a balata</div>' +
           '<div>' + K('HOLD CLICK') + ' lay a row</div><div>' + K('HOLD E') + ' shovel mouna</div>' +
-          '<div>' + K('E') + ' talk / buy food / open a billboard</div><div>' + K('V') + ' first / third person</div>' +
+          '<div>' + K('E') + ' talk / buy food / kiosk / billboard</div><div>' + K('V') + ' first / third person</div>' +
+          '<div>' + K('Q') + ' eat from the pouch</div><div>' + K('F') + ' hit someone</div>' +
           '<div>' + K('[') + K(']') + ' mouse sensitivity</div><div>' + K('M') + ' sound</div>' +
           '<div>' + K('ESC') + ' pause menu</div><div>' + K('SCROLL') + ' zoom</div>' +
           '</div></div>' + back;
@@ -1837,10 +1829,8 @@
       paintTiers();
       paintNumbers();
       paintSea();
-      if (shopOpen) renderShop(Object.assign({}, lastShopState, {
-        lira: S.lira, mortar: S.mortar, mortarMax: S.mortarMax,
-        workers: S.workers, unlocked: S.unlocked
-      }));
+      // the kiosk's items are priced by the game, which re-opens it on a buy
+      if (shopOpen) elPurse.textContent = fmt(S.lira);
     }
 
     function paintNumbers() {
@@ -2182,6 +2172,7 @@
       menuMode: function () { return introOpen ? menuState.mode : null; },
       closeSheet: function () { if (sheetName) { openSheet(''); focusFirst(); return true; } return false; },
       setBuffs: setBuffs,
+      setPouch: setPouch,
       hurt: hurt,
       showFaint: showFaint,
       hideFaint: hideFaint,
@@ -2567,6 +2558,20 @@
       track(o, t + 0.3);
     }
 
+    // a slap: a short bright knock over a low body, for a fist or a sandal
+    function thump() {
+      const c = ensure(); if (busy()) return;
+      const t = c.currentTime + 0.001;
+      const o = ctx.createOscillator();
+      o.type = 'triangle';
+      o.frequency.setValueAtTime(320, t);
+      o.frequency.exponentialRampToValueAtTime(90, t + 0.09);
+      const g = envGain(t, 0.36, 0.002, 0.12);
+      o.connect(g); g.connect(master);
+      o.start(t);
+      track(o, t + 0.15);
+    }
+
     /* --------------------------------------------------------------- the sea */
     function wash(level) {
       const c = ensure(); if (!c) return;
@@ -2582,7 +2587,7 @@
 
     const sfx = {
       clack: clack, pour: pour, crumble: crumble, splash: splash,
-      gull: gull, ui: ui, purchase: purchase, hurt: hurt, wash: wash, say: voiceBlip,
+      gull: gull, ui: ui, purchase: purchase, hurt: hurt, thump: thump, wash: wash, say: voiceBlip,
       unlock: function () {
         const c = ensure();
         if (!c) return;
