@@ -1088,11 +1088,11 @@
         '@media (orientation:portrait){#trotate{display:flex}}' +
         // a phone on its side is only ~360-430px tall: smaller stick and buttons
         '@media (max-height:500px){' +
-        '#tstick{width:104px;height:104px;left:calc(14px + env(safe-area-inset-left,0px));bottom:calc(14px + env(safe-area-inset-bottom,0px))}' +
-        '#tnub{width:42px;height:42px;margin:-21px 0 0 -21px}' +
-        '#tbtns{gap:6px;right:calc(12px + env(safe-area-inset-right,0px));bottom:calc(14px + env(safe-area-inset-bottom,0px))}' +
-        '#tbtns button{font-size:14px;padding:9px 14px;border-width:2px;min-width:92px}' +
-        '#tlay{font-size:18px!important}}';
+        '#tstick{width:86px;height:86px;border-width:2px;left:calc(10px + env(safe-area-inset-left,0px));bottom:calc(10px + env(safe-area-inset-bottom,0px))}' +
+        '#tnub{width:34px;height:34px;margin:-17px 0 0 -17px}' +
+        '#tbtns{gap:5px;right:calc(10px + env(safe-area-inset-right,0px));bottom:calc(10px + env(safe-area-inset-bottom,0px))}' +
+        '#tbtns button{font-size:12px;padding:7px 10px;border-width:2px;min-width:72px}' +
+        '#tlay{font-size:15px!important}}';
       document.head.appendChild(st);
       document.body.appendChild(wrap);
       var stick = wrap.querySelector('#tstick'), nub = wrap.querySelector('#tnub');
