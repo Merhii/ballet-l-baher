@@ -1292,7 +1292,7 @@
       if (tTalk) {
         var tShow = (who || board) ? 'block' : 'none';
         var tText = board ? 'OPEN AD' : (who && who.npc.def.sells ? 'BUY'
-          : (who && who.npc.def.ferryTo ? 'BOAT' : (who && who.npc.def.shop ? 'SHOP' : 'TALK')));
+          : (who && who.npc.def.ferryTo ? 'BOAT' : (who && who.npc.def.shop ? 'WHISH' : 'TALK')));
         // written only when they change: this runs every frame on a phone
         if (tTalk.style.display !== tShow) tTalk.style.display = tShow;
         if (tTalk.textContent !== tText) tTalk.textContent = tText;
@@ -1310,7 +1310,7 @@
           ? food.name.toLowerCase() + ' · ' + food.price + ' l.l.'
           : (who.npc.def.ferryTo === 'ziri' ? 'boat to Jazirat Ziri · ' + FERRY_PRICE + ' l.l.'
             : (who.npc.def.ferryTo ? 'boat back to the corniche · free'
-              : (who.npc.def.shop ? 'kiosk · upgrades' : 'talk to ' + who.npc.def.name)));
+              : (who.npc.def.shop ? 'Whish Money · upgrades' : 'talk to ' + who.npc.def.name)));
         if (who.npc.anger > 0) label = who.npc.def.name + ' is angry with you';
         hud.setPrompt(IS_TOUCH ? label : 'E — ' + label + (who.dist <= HIT_REACH ? ' · F — hit' : ''));
       } else if (pile && keys.KeyE) {
@@ -1521,7 +1521,6 @@
           { t: 'El nasi7a balash. Kell shi tene bi kallef.', ar: 'النصيحة بلاش' }
         ],
         lines: {
-          greet: [{ t: 'Inta elli 3am tballet el ba7er. Tayyeb.', ar: 'طيّب' }],
           idle: [
             { t: 'El ba7er zboun 3atel. Ma bidfa3.', ar: 'ما بيدفع' },
             { t: 'Sfouf mestawye. Fawasel day2a. Bass hék.', ar: 'بس هيك' },
@@ -1530,9 +1529,11 @@
           lost: [{ t: 'Shefet el taraf? Men hon bye2ta3.', ar: 'من هون بيقطع' }],
           milestone: [{ t: '{n} balata. Ya zalame. Inta jidde.', ar: 'يا زلمة' }],
           spent: [{ t: 'Esta2id. El shughl ma bikhlas, w inta btekhlas.', ar: 'استقيد' }],
-          sold: [{ t: 'Mabrouk. Halla2 ma 3andak 7ejje.', ar: 'ما عندك حجة' },
+          greet: [{ t: 'Whish Money. Shu bedak? Edfa3 men telefonak.', ar: 'ادفع من تلفونك' }],
+          sold: [{ t: 'Wasalet 3al Whish. Mabrouk.', ar: 'وصلت عالويش' },
+                 { t: 'Mabrouk. Halla2 ma 3andak 7ejje.', ar: 'ما عندك حجة' },
                  { t: 'Shughl nadif. Ista3mela mneeh.', ar: 'استعملها منيح' }],
-          pricey: [{ t: 'Ma ma3ak. Ballet, w ta3a.', ar: 'ما معك' }],
+          pricey: [{ t: 'El rased ma byekfi. Ballet, w ta3a.', ar: 'الرصيد ما بيكفي' }],
           hit: [{ t: 'Ana banét el kornish, w inta bteDrobne?!', ar: 'بتضربني؟' },
                 { t: 'Ya 2alil el adab!', ar: 'يا قليل الأدب' }],
           angry: [{ t: 'Ma fi bay3 la 2alil el adab. Ba3dén.', ar: 'ما في بيع' }]
@@ -1780,7 +1781,7 @@
       if (npc.anger > 0) {
         if (!npcSay(npc, 'angry')) sayLine(npc, pick(GENERIC_ANGRY));
         npc.facing = 1.4;
-        if (npc.def.shop) hud.toast('El Muallim is not selling to you right now.', 'bad');
+        if (npc.def.shop) hud.toast('El Muallim will not take your Whish payment right now.', 'bad');
         return true;
       }
       if (npc.def.shop) { openKiosk(npc); return true; }
@@ -2485,14 +2486,15 @@
     function shopState() {
       return {
         lira: Math.floor(S.lira),
+        agent: 'El Muallim · Whish Money agent, Saida corniche',
         items: UPGRADES.map(function (u) {
           var lvl = S.upg[u.id] || 0, maxed = lvl >= u.vals.length - 1;
           var price = maxed ? 0 : u.prices[lvl];
           return {
-            id: u.id, name: u.name + ' — ' + u.ar, color: '#' + ('000000' + u.color.toString(16)).slice(-6),
+            id: u.id, name: u.name, color: '#' + ('000000' + u.color.toString(16)).slice(-6),
             price: price, maxed: maxed, level: lvl + 1, levels: u.vals.length,
             disabled: !maxed && S.lira < price,
-            note: u.note(u.vals[lvl], maxed ? null : u.vals[lvl + 1]) + ' · level ' + (lvl + 1) + '/' + u.vals.length
+            note: u.note(u.vals[lvl], maxed ? null : u.vals[lvl + 1])   // the level shows as bars
           };
         })
       };
@@ -2523,11 +2525,20 @@
       applyUpgrades();
       if (id === 'back') S.health = Math.min(S.staminaMax, S.health + (S.staminaMax - oldMax));
       sfx.purchase();
-      hud.toast(u.name + ' · level ' + (lvl + 2) + ' · −' + price + ' l.l.', 'good');
+      hud.toast('Whish · ' + u.name + ' level ' + (lvl + 2) + ' · −' + price + ' l.l.', 'good');
       if (muallim) npcSay(muallim, 'sold');
       pushStats();
       save();
       hud.openShop(shopState());
+      // the in-game receipt: a made-up reference, clearly the game's own
+      if (hud.showReceipt) {
+        hud.showReceipt({
+          amount: price, to: 'El Muallim (agent)',
+          what: u.name + ' · level ' + (lvl + 2),
+          balance: Math.floor(S.lira),
+          ref: 'BLB-' + String(Math.floor(S.elapsed * 1000) % 1000000).padStart(6, '0')
+        });
+      }
     }
 
     // ------------------------------------------------------------ food pouch

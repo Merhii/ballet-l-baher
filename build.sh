@@ -107,6 +107,18 @@ if os.path.exists(THREE_SRC):
         if os.path.exists(os.path.join('brand', name)):
             with open(os.path.join('brand', name), 'rb') as src, open(os.path.join('docs', name), 'wb') as dst:
                 dst.write(src.read())
+    # the Whish Money logo for the kiosk sign and the in-game Whish app. The
+    # game falls back to a text wordmark when neither file is there. Also
+    # copied next to the local standalone build so it shows when testing.
+    for name in ('whish-logo.svg', 'whish-logo.png'):
+        src = os.path.join('brand', name)
+        for out in ('docs', 'dist/standalone'):
+            dst = os.path.join(out, name)
+            if os.path.exists(src):
+                with open(src, 'rb') as a, open(dst, 'wb') as b:
+                    b.write(a.read())
+            elif os.path.exists(dst):
+                os.remove(dst)
     for stale in ('docs/cms.html', 'docs/ads.js'):
         if os.path.exists(stale):
             os.remove(stale)

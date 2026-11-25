@@ -456,59 +456,85 @@
 '.blb-load .t{height:100%;background-image:repeating-linear-gradient(115deg,',
 '  var(--blb-haz) 0 9px,var(--blb-ink) 9px 18px);width:0%;transition:width .25s linear;}',
 
-/* --- shop: the muallim kiosk -------------------------------------------- */
+/* --- shop: the Whish Money app on your phone ----------------------------- */
+/* The one place the game leaves its screen-print look: this is a phone in
+   your hand, in the brand's colours. Swap --wh-red for the brand's exact
+   red if it differs. */
 '.blb-shop{position:absolute;inset:0;display:none;align-items:center;',
 '  justify-content:center;padding:18px 12px;pointer-events:auto;',
-'  background:radial-gradient(120% 90% at 50% 40%,rgba(22,112,140,.62),rgba(11,58,79,.88));}',
+'  background:radial-gradient(120% 90% at 50% 40%,rgba(22,112,140,.55),rgba(11,58,79,.88));}',
 '.blb-shop.on{display:flex;}',
-'.blb-kiosk{position:relative;width:min(720px,100%);max-height:calc(100vh - 36px);',
-'  max-height:calc(100dvh - 36px);overflow-y:auto;overflow-x:hidden;',
-'  box-shadow:6px 6px 0 0 rgba(10,26,51,.6);}',
-/* two strips of tape holding the price list to the glass */
-'.blb-kiosk:before,.blb-kiosk:after{content:"";position:absolute;top:-11px;width:76px;',
-'  height:24px;background:rgba(237,246,243,.46);border-left:1px solid rgba(11,58,79,.18);',
-'  border-right:1px solid rgba(11,58,79,.18);pointer-events:none;z-index:3;}',
-'.blb-kiosk:before{left:12px;transform:rotate(-7deg);}',
-'.blb-kiosk:after{right:12px;transform:rotate(5deg);}',
-'.blb-kiosk .cap{height:9px;}',
-'.blb-khd{padding:12px 16px 10px;border-bottom:2px solid var(--blb-ink);',
-'  display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;}',
-'.blb-khd h2{font-family:var(--blb-kufi);font-size:clamp(24px,5.4vw,34px);font-weight:600;',
-'  line-height:1;text-shadow:2px 2px 0 var(--blb-ghost);}',
-'.blb-khd .sub{font-size:12px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;',
-'  opacity:.7;margin-top:4px;}',
-'.blb-khd .purse{text-align:right;}',
-'.blb-khd .purse .v{font-size:clamp(20px,4.6vw,27px);font-weight:700;color:var(--blb-rust);',
-'  font-variant-numeric:tabular-nums;line-height:1;}',
-'.blb-close{pointer-events:auto;padding:5px 10px 6px;font-size:11px;font-weight:700;',
-'  letter-spacing:.14em;text-transform:uppercase;border:2px solid var(--blb-ink);',
-'  background:var(--blb-paper);}',
-'.blb-close:hover{background:var(--blb-terra);color:var(--blb-foam);}',
-'.blb-ksec{padding:11px 16px 4px;font-size:11px;font-weight:700;letter-spacing:.16em;',
-'  text-transform:uppercase;opacity:.65;display:flex;align-items:center;gap:9px;}',
-'.blb-ksec span:last-child{flex:1;height:2px;background:var(--blb-ink);opacity:.2;}',
-'.blb-items{padding:0 16px 16px;display:grid;gap:3px;}',
-/* a hand-lettered price list: name, dotted leader, price, buy */
-'.blb-item{display:grid;grid-template-columns:26px minmax(0,1fr) auto auto;gap:10px;',
-'  align-items:center;padding:8px 0;border-bottom:1px dashed rgba(11,58,79,.3);}',
-'.blb-item .ic{width:26px;height:26px;border:2px solid var(--blb-ink);',
-'  box-shadow:inset 0 -4px 0 rgba(11,58,79,.16);}',
-'.blb-item .ic.round{border-radius:50%;}',
-'.blb-item .nm{font-size:15px;font-weight:700;letter-spacing:.035em;line-height:1.1;}',
-'.blb-item .no{font-size:12px;opacity:.68;margin-top:1px;line-height:1.2;}',
-'.blb-item .pr{font-size:17px;font-weight:700;white-space:nowrap;color:var(--blb-rust);',
-'  font-variant-numeric:tabular-nums;}',
-'.blb-item .pr small{font-size:11px;font-weight:600;opacity:.7;}',
-'.blb-buy{pointer-events:auto;padding:6px 13px 7px;font-size:12px;font-weight:700;',
-'  letter-spacing:.11em;text-transform:uppercase;background:var(--blb-haz);',
-'  border:2px solid var(--blb-ink);box-shadow:2px 2px 0 0 var(--blb-ink);',
-'  transition:transform .08s,box-shadow .08s;white-space:nowrap;}',
-'.blb-buy:hover{transform:translate(1px,1px);box-shadow:1px 1px 0 0 var(--blb-ink);}',
-'.blb-buy:active{transform:translate(2px,2px);box-shadow:0 0 0 0 var(--blb-ink);}',
-'.blb-buy[disabled]{background:var(--blb-cement);color:rgba(11,58,79,.5);',
-'  box-shadow:none;cursor:not-allowed;border-color:rgba(11,58,79,.45);}',
-'.blb-item.owned .pr{color:var(--blb-palm);}',
-'.blb-kft{padding:0 16px 14px;font-size:11px;opacity:.6;letter-spacing:.03em;}',
+'.blb-whish{--wh-red:#E30613;--wh-red-dk:#A8000F;--wh-ink:#18181b;--wh-mute:#6b6b74;',
+'  --wh-bg:#f3f3f5;--wh-line:#e4e4e8;position:relative;display:flex;flex-direction:column;',
+'  width:min(360px,100%);height:min(700px,calc(100vh - 36px));height:min(700px,calc(100dvh - 36px));',
+'  overflow:hidden;border-radius:34px;border:9px solid #101014;background:var(--wh-bg);',
+'  box-shadow:0 24px 60px rgba(10,26,51,.55),0 0 0 1px rgba(255,255,255,.08);',
+'  font-family:-apple-system,"SF Pro Text","Segoe UI",Roboto,system-ui,sans-serif;',
+'  color:var(--wh-ink);letter-spacing:0;line-height:1.3;text-transform:none;',
+'  animation:wh-up .22s cubic-bezier(.2,.9,.3,1) both;}',
+'@keyframes wh-up{from{opacity:0;transform:translateY(18px) scale(.98);}to{opacity:1;transform:none;}}',
+'.wh-status{display:flex;justify-content:space-between;align-items:center;padding:7px 20px 2px;',
+'  font-size:12px;font-weight:600;background:#fff;font-variant-numeric:tabular-nums;}',
+'.wh-ind{display:flex;align-items:flex-end;gap:2px;}',
+'.wh-ind i{display:block;width:3px;background:var(--wh-ink);border-radius:1px;}',
+'.wh-ind i:nth-child(1){height:5px;} .wh-ind i:nth-child(2){height:7px;} .wh-ind i:nth-child(3){height:9px;}',
+'.wh-ind b{display:block;width:20px;height:9px;margin-left:5px;border:1.5px solid var(--wh-ink);',
+'  border-radius:3px;background:linear-gradient(90deg,var(--wh-ink) 70%,transparent 70%);',
+'  background-clip:content-box;padding:1px;}',
+'.wh-top{display:flex;align-items:center;justify-content:space-between;padding:8px 16px 10px;',
+'  background:#fff;border-bottom:1px solid var(--wh-line);}',
+'.wh-logo{height:28px;display:flex;align-items:center;}',
+'.wh-logo img{height:28px;width:auto;display:block;}',
+'.wh-word{font-size:25px;font-weight:800;letter-spacing:-.03em;color:var(--wh-red);line-height:1;}',
+'.blb .wh-x{pointer-events:auto;width:30px;height:30px;border-radius:50%;background:var(--wh-bg);',
+'  color:var(--wh-ink);font-size:13px;display:grid;place-items:center;}',
+'.blb .wh-x:hover{background:var(--wh-line);}',
+'.wh-main{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding:14px 14px 16px;}',
+'.wh-bal{position:relative;overflow:hidden;padding:15px 16px 14px;border-radius:18px;color:#fff;',
+'  background:linear-gradient(135deg,var(--wh-red) 0%,var(--wh-red-dk) 100%);',
+'  box-shadow:0 8px 20px rgba(168,0,15,.28);}',
+'.wh-bal:after{content:"";position:absolute;right:-40px;top:-50px;width:150px;height:150px;',
+'  border-radius:50%;background:rgba(255,255,255,.10);}',
+'.wh-bl{font-size:12px;font-weight:500;opacity:.85;}',
+'.wh-bv{margin-top:2px;font-size:30px;font-weight:700;letter-spacing:-.01em;',
+'  font-variant-numeric:tabular-nums;line-height:1.1;}',
+'.wh-bv small{font-size:14px;font-weight:600;opacity:.85;}',
+'.wh-ag{display:flex;align-items:center;gap:6px;margin-top:10px;font-size:11.5px;opacity:.92;}',
+'.wh-dot{width:7px;height:7px;border-radius:50%;background:#7CF2A0;box-shadow:0 0 0 3px rgba(124,242,160,.25);}',
+'.wh-sec{margin:16px 2px 8px;font-size:13px;font-weight:700;}',
+'.wh-item{display:grid;grid-template-columns:38px minmax(0,1fr) auto;gap:11px;align-items:center;',
+'  padding:11px 12px;margin-bottom:8px;background:#fff;border-radius:14px;',
+'  box-shadow:0 1px 2px rgba(0,0,0,.05);}',
+'.wh-item .ic{width:38px;height:38px;border-radius:11px;box-shadow:inset 0 -6px 0 rgba(0,0,0,.12);}',
+'.wh-item .nm{font-size:14px;font-weight:600;line-height:1.2;}',
+'.wh-item .no{font-size:11.5px;color:var(--wh-mute);margin-top:2px;line-height:1.25;}',
+'.wh-item .lv{display:flex;gap:3px;margin-top:6px;}',
+'.wh-item .lv i{display:block;width:14px;height:4px;border-radius:2px;background:var(--wh-line);}',
+'.wh-item .lv i.on{background:var(--wh-red);}',
+'.blb .wh-pay{pointer-events:auto;padding:8px 12px;border-radius:999px;background:var(--wh-red);',
+'  color:#fff;font-size:12.5px;font-weight:600;white-space:nowrap;transition:transform .08s,background .12s;}',
+'.blb .wh-pay b{font-weight:700;font-variant-numeric:tabular-nums;}',
+'.blb .wh-pay:hover{background:var(--wh-red-dk);}',
+'.blb .wh-pay:active{transform:scale(.96);}',
+'.blb .wh-pay[disabled]{background:var(--wh-line);color:var(--wh-mute);cursor:not-allowed;}',
+'.wh-item.maxed .wh-pay{background:transparent;color:#1f9d55;}',
+/* the receipt: a sheet that slides up over the app */
+'.wh-rcpt{position:absolute;left:0;right:0;bottom:0;padding:22px 20px 18px;background:#fff;',
+'  border-radius:22px 22px 0 0;text-align:center;visibility:hidden;',
+'  transform:translateY(105%);transition:transform .26s cubic-bezier(.2,.9,.3,1),visibility 0s .26s;}',
+'.wh-rcpt.on{transform:none;visibility:visible;box-shadow:0 -10px 30px rgba(0,0,0,.16);',
+'  transition:transform .26s cubic-bezier(.2,.9,.3,1);}',
+'.wh-ok{width:52px;height:52px;margin:0 auto;border-radius:50%;background:#1f9d55;display:grid;place-items:center;}',
+'.wh-ok svg{width:28px;height:28px;fill:none;stroke:#fff;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round;}',
+'.wh-rt{margin-top:10px;font-size:15px;font-weight:700;}',
+'.wh-ra{margin-top:2px;font-size:26px;font-weight:700;font-variant-numeric:tabular-nums;}',
+'.wh-ra small{font-size:13px;color:var(--wh-mute);}',
+'.wh-rcpt dl{display:grid;grid-template-columns:auto 1fr;gap:5px 12px;margin:14px 0 16px;',
+'  padding-top:12px;border-top:1px dashed var(--wh-line);text-align:left;font-size:12.5px;}',
+'.wh-rcpt dt{color:var(--wh-mute);} .wh-rcpt dd{text-align:right;font-weight:600;font-variant-numeric:tabular-nums;}',
+'.blb .wh-done{pointer-events:auto;width:100%;padding:11px;border-radius:12px;background:var(--wh-ink);',
+'  color:#fff;font-size:14px;font-weight:600;}',
+'@media (prefers-reduced-motion:reduce){.blb-whish{animation:none;} .wh-rcpt{transition:none;}}',
 ''].join('\n');
 
   const STYLE3 = [
@@ -612,10 +638,6 @@
 '  .blb-heckle .tx{font-size:14px;}',
 '  .blb-prompt{margin-top:24px;max-width:92vw;}',
 '  .blb-prompt .tx{font-size:12px;padding:4px 8px 5px;}',
-'  .blb-item{grid-template-columns:22px minmax(0,1fr) auto;gap:8px;}',
-'  .blb-item .ic{width:22px;height:22px;}',
-'  .blb-buy{grid-column:3;padding:5px 9px 6px;font-size:11px;}',
-'  .blb-item .pr{grid-column:2;grid-row:2;font-size:15px;}',
 '  .blb-ititle .ar{text-shadow:3px 3px 0 var(--blb-haz);}',
 '  .blb-stamp{position:static;margin:18px auto 0;transform:rotate(-6deg);}',
 '}',
@@ -824,16 +846,23 @@
 '  .blb-pouch{grid-column:1 / -1;order:11;padding:2px 5px;gap:3px;} .blb-pouch .k{font-size:7.5px;}',
 '  .blb-pouch .pip{font-size:8px;padding:1px 4px;min-width:14px;}',
 /* the kiosk: one compact price list that fits a phone on its side */
-'  .blb-shop{padding:8px 10px;} .blb-kiosk{width:min(560px,100%);max-height:calc(100vh - 16px);}',
-'  .blb-kiosk:before,.blb-kiosk:after{display:none;} .blb-kiosk .cap{height:5px;}',
-'  .blb-khd{padding:6px 12px 5px;gap:8px;} .blb-khd h2{font-size:20px;} .blb-khd .sub{display:none;}',
-'  .blb-khd .purse{display:flex;align-items:center;gap:8px;} .blb-khd .purse .blb-lbl{display:none;}',
-'  .blb-khd .purse .v{font-size:17px;} .blb-close{padding:4px 9px 5px;font-size:10px;}',
-'  .blb-ksec{padding:5px 12px 2px;font-size:9.5px;} .blb-items{padding:0 12px 8px;gap:1px;}',
-'  .blb-item{grid-template-columns:20px minmax(0,1fr) auto auto;gap:8px;padding:4px 0;}',
-'  .blb-item .ic{width:20px;height:20px;} .blb-item .nm{font-size:12.5px;} .blb-item .no{font-size:10px;}',
-'  .blb-item .pr{font-size:13px;} .blb-buy{padding:4px 9px 5px;font-size:10.5px;}',
-'  .blb-kft{display:none;}',
+/* the Whish app turns sideways with the phone: balance card left, list right */
+'  .blb-shop{padding:6px 10px;}',
+'  .blb-whish{width:min(620px,100%);height:calc(100vh - 12px);height:calc(100dvh - 12px);',
+'    border-radius:24px;border-width:7px;}',
+'  .wh-status{display:none;} .wh-top{padding:6px 14px 6px;} .wh-logo,.wh-logo img{height:22px;}',
+'  .wh-word{font-size:20px;} .blb .wh-x{width:26px;height:26px;font-size:11px;}',
+'  .wh-main{display:grid;grid-template-columns:190px minmax(0,1fr);gap:12px;padding:10px 12px;}',
+'  .wh-bal{align-self:start;padding:12px 13px;border-radius:14px;} .wh-bv{font-size:23px;}',
+'  .wh-ag{font-size:10.5px;margin-top:8px;}',
+'  .wh-list{min-height:0;} .wh-sec{margin:0 2px 6px;font-size:11.5px;}',
+'  .wh-item{grid-template-columns:28px minmax(0,1fr) auto;gap:9px;padding:7px 9px;margin-bottom:6px;border-radius:11px;}',
+'  .wh-item .ic{width:28px;height:28px;border-radius:8px;} .wh-item .nm{font-size:12.5px;}',
+'  .wh-item .no{font-size:10.5px;} .wh-item .lv{margin-top:4px;}',
+'  .blb .wh-pay{padding:6px 10px;font-size:11.5px;}',
+'  .wh-rcpt{left:0;right:0;width:min(340px,100%);margin:0 auto;padding:14px 16px 12px;}',
+'  .wh-ok{width:38px;height:38px;} .wh-ok svg{width:20px;height:20px;} .wh-ra{font-size:21px;}',
+'  .wh-rcpt dl{margin:8px 0 10px;padding-top:8px;gap:3px 10px;font-size:11.5px;} .blb .wh-done{padding:8px;}',
 '  .blb-tr{top:6px;right:6px;gap:4px;} .blb-phase{font-size:7.5px;padding:2px 5px 3px;}',
 '  .blb-snd,.blb-menubtn{width:26px;height:22px;} .blb-snd svg,.blb-menubtn svg{width:13px;height:13px;}',
 '  .blb-toasts{top:34px;right:6px;width:min(210px,28vw);gap:3px;}',
@@ -1341,27 +1370,44 @@
     const elLoadT = load.querySelector('.t');
     r.appendChild(load);
 
-    /* ============================================== shop — the muallim kiosk */
+    /* ======================================= shop — the Whish Money agent */
+    /* El Muallim's kiosk is a Whish Money point. The shop opens as the Whish
+       app on your phone: balance on top, the upgrades as things you pay for,
+       and a receipt after each payment. The logo is the brand's own file
+       (brand/whish-logo.svg or .png, shipped next to the page); until it is
+       there, a plain text wordmark stands in. */
     let lastPrices = {};
     let lastShopState = {};
 
     const shop = el('div', 'blb-shop');
-    const kiosk = el('div', 'blb-plaque blb-kiosk');
+    const kiosk = el('div', 'blb-whish');
     kiosk.setAttribute('role', 'dialog');
     kiosk.setAttribute('aria-modal', 'true');
-    kiosk.setAttribute('aria-label', 'The muallim kiosk');
+    kiosk.setAttribute('aria-label', 'Whish Money');
     kiosk.innerHTML =
-      '<div class="cap blb-haz"></div>' +
-      '<div class="blb-khd">' +
-        '<div><h2 class="blb-ar">عند المعلّم</h2>' +
-        '<div class="sub blb-print">Price list. Hand-written, non-negotiable (mostly)</div></div>' +
-        '<div class="purse"><div class="blb-lbl">In your pocket</div>' +
-        '<div class="v" data-purse>0</div>' +
-        '<button class="blb-close" type="button" data-close>Khalas</button></div>' +
+      '<div class="wh-status"><span data-clock>9:41</span>' +
+        '<span class="wh-ind"><i></i><i></i><i></i><b></b></span></div>' +
+      '<div class="wh-top">' +
+        '<div class="wh-logo" data-logo><span class="wh-word">whish</span></div>' +
+        '<button class="wh-x" type="button" data-close aria-label="Close Whish Money">✕</button>' +
       '</div>' +
-      '<div data-body></div>' +
-      '<div class="blb-kft">No refunds. The sea does not issue receipts.</div>';
+      '<div class="wh-main">' +
+        '<div class="wh-bal">' +
+          '<div class="wh-bl">Your balance</div>' +
+          '<div class="wh-bv"><span data-purse>0</span> <small>L.L.</small></div>' +
+          '<div class="wh-ag"><span class="wh-dot"></span><span data-agent>Whish Money agent · Saida corniche</span></div>' +
+        '</div>' +
+        '<div class="wh-list">' +
+          '<div class="wh-sec">Pay at this agent</div>' +
+          '<div data-body></div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="wh-rcpt" data-rcpt aria-live="polite"></div>';
     const elPurse = kiosk.querySelector('[data-purse]');
+    const elAgent = kiosk.querySelector('[data-agent]');
+    const elClock = kiosk.querySelector('[data-clock]');
+    const elLogo = kiosk.querySelector('[data-logo]');
+    const elRcpt = kiosk.querySelector('[data-rcpt]');
     const shopBody = kiosk.querySelector('[data-body]');
     const btnClose = kiosk.querySelector('[data-close]');
     btnClose.addEventListener('click', function () { closeShop(); });
@@ -1369,58 +1415,93 @@
     shop.addEventListener('mousedown', function (e) { if (e.target === shop) closeShop(); });
     r.appendChild(shop);
 
+    // the brand's logo, if it ships with the page; svg first, then png
+    (function loadWhishLogo() {
+      if (typeof Image === 'undefined') return;
+      const tries = ['whish-logo.svg', 'whish-logo.png'];
+      (function next(i) {
+        if (i >= tries.length) return;
+        const img = new Image();
+        img.alt = 'Whish Money';
+        img.onload = function () { elLogo.innerHTML = ''; elLogo.appendChild(img); };
+        img.onerror = function () { next(i + 1); };
+        img.src = tries[i];
+      })(0);
+    })();
+
     function priceOf(id, pr, fallback) {
       const v = pr && pr[id];
       return Math.max(0, Math.round(num(v, num(fallback, PRICE[id] || 0))));
     }
 
     function shopItem(o) {
-      const n = el('div', 'blb-item' + (o.owned ? ' owned' : ''));
-      const icon = '<div class="ic' + (o.round ? ' round' : '') + '" style="background:' +
-        o.color + '"></div>';
-      n.innerHTML = icon +
-        '<div><div class="nm">' + esc(o.name) + '</div>' +
-        '<div class="no">' + esc(o.note) + '</div></div>' +
-        '<div class="pr">' + (o.owned ? '3andak' :
-          fmt(o.price) + ' <small>l.l.</small>') + '</div>';
-      const b = el('button', 'blb-buy', esc(o.cta || 'Buy'));
+      const n = el('div', 'wh-item' + (o.owned ? ' maxed' : ''));
+      let pips = '';
+      for (let i = 0; i < o.levels; i++) pips += '<i' + (i < o.level ? ' class="on"' : '') + '></i>';
+      n.innerHTML =
+        '<div class="ic" style="background:' + o.color + '"></div>' +
+        '<div class="tx"><div class="nm">' + esc(o.name) + '</div>' +
+        '<div class="no">' + esc(o.note) + '</div>' +
+        (o.levels > 1 ? '<div class="lv">' + pips + '</div>' : '') + '</div>';
+      const b = el('button', 'wh-pay');
       b.type = 'button';
-      if (o.owned || o.disabled) {
-        b.disabled = true;
-        b.textContent = o.owned ? 'Done' : 'No lira';
+      if (o.owned) { b.disabled = true; b.textContent = 'Maxed'; }
+      else {
+        b.innerHTML = 'Pay <b>' + fmt(o.price) + '</b>';
+        if (o.disabled) { b.disabled = true; b.classList.add('short'); }
       }
-      b.setAttribute('aria-label', (o.owned ? 'Already bought: ' : 'Buy ') + o.name +
-        (o.owned ? '' : ' for ' + fmt(o.price) + ' lira'));
+      b.setAttribute('aria-label', o.owned ? o.name + ': fully upgraded'
+        : 'Pay ' + fmt(o.price) + ' lira for ' + o.name + (o.disabled ? ' (not enough balance)' : ''));
       b.addEventListener('click', function () { if (!b.disabled) onBuy(o.id); });
       n.appendChild(b);
       return n;
     }
 
-    function shopSection(arTitle, enTitle) {
-      const h = el('div', 'blb-ksec');
-      h.innerHTML = '<span class="blb-ar" style="font-family:var(--blb-kufi);' +
-        'font-size:14px;letter-spacing:0">' + esc(arTitle) + '</span>' +
-        '<span>' + esc(enTitle) + '</span><span></span>';
-      return h;
-    }
-
     /* The game owns the economy: it hands over `items` already priced, and a
-       Buy click goes straight back through onBuy(id). */
+       Pay tap goes straight back through onBuy(id). */
     function renderShop(st) {
       st = st || {};
       const lira = num(st.lira, S.lira);
       elPurse.textContent = fmt(lira);
+      if (st.agent) elAgent.textContent = st.agent;
+      try {
+        const d = new Date();
+        elClock.textContent = d.getHours() + ':' + ('0' + d.getMinutes()).slice(-2);
+      } catch (e) { /* keep 9:41 */ }
       shopBody.innerHTML = '';
-      shopBody.appendChild(shopSection('العدّة', 'The kit'));
-      const list = el('div', 'blb-items');
       (st.items || []).forEach(function (it) {
-        list.appendChild(shopItem({
+        shopBody.appendChild(shopItem({
           id: it.id, color: it.color || pal.CEMENT, price: num(it.price, 0),
           owned: !!it.maxed, disabled: !!it.disabled,
-          name: it.name, note: it.note || '', cta: 'Upgrade'
+          level: num(it.level, 1), levels: num(it.levels, 1),
+          name: it.name, note: it.note || ''
         }));
       });
-      shopBody.appendChild(list);
+    }
+
+    /* the payment confirmation: slides up over the app, Done puts it away */
+    let rcptTimer = 0;
+    function showReceipt(o) {
+      o = o || {};
+      elRcpt.innerHTML =
+        '<div class="wh-ok"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.2 4.2L19 7"/></svg></div>' +
+        '<div class="wh-rt">Payment successful</div>' +
+        '<div class="wh-ra">' + fmt(num(o.amount, 0)) + ' <small>L.L.</small></div>' +
+        '<dl>' +
+          '<dt>To</dt><dd>' + esc(o.to || 'Whish Money agent') + '</dd>' +
+          '<dt>For</dt><dd>' + esc(o.what || '') + '</dd>' +
+          '<dt>Balance</dt><dd>' + fmt(num(o.balance, 0)) + ' L.L.</dd>' +
+          '<dt>Ref</dt><dd>' + esc(o.ref || '') + '</dd>' +
+        '</dl>' +
+        '<button type="button" class="wh-done">Done</button>';
+      elRcpt.querySelector('.wh-done').addEventListener('click', hideReceipt);
+      elRcpt.classList.add('on');
+      clearTimeout(rcptTimer);
+      rcptTimer = setTimeout(hideReceipt, 4200);
+    }
+    function hideReceipt() {
+      clearTimeout(rcptTimer);
+      elRcpt.classList.remove('on');
     }
 
     /* ===================================================== intro title card */
@@ -2011,6 +2092,7 @@
       try { btnClose.focus(); } catch (e) {}
     }
     function closeShop() {
+      hideReceipt();
       shop.classList.remove('on');
       shopOpen = false;
     }
@@ -2152,6 +2234,7 @@
       isSaying: isSaying,
       setPhase: setPhase,
       openShop: openShop,
+      showReceipt: showReceipt,
       closeShop: closeShop,
       showIntro: showIntro,
       hideIntro: hideIntro,

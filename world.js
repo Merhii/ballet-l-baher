@@ -139,6 +139,58 @@
     return t;
   }
 
+  /* 0b. the Whish Money agent sign over El Muallim's kiosk. White panel, the
+         brand's red, its own logo file when the page ships one (whish-logo.svg
+         or .png next to the page), a plain text wordmark until then. */
+  function texWhishSign() {
+    const w = 1024, h = 160, RED = '#E30613';
+    const c = cv(w, h), g = c.getContext('2d');
+    let logo = null;
+    function draw() {
+      g.clearRect(0, 0, w, h);
+      g.fillStyle = '#ffffff';
+      g.fillRect(0, 0, w, h);
+      g.fillStyle = RED;
+      g.fillRect(0, h - 22, w, 22);                       // red band along the bottom
+      g.textBaseline = 'middle';
+      const cy = (h - 22) / 2;
+      if (logo) {
+        const lh = h * 0.56, lw = lh * (logo.width / Math.max(1, logo.height));
+        g.drawImage(logo, 48, cy - lh / 2, lw, lh);
+      } else {
+        g.fillStyle = RED;
+        g.textAlign = 'left';
+        g.font = '800 ' + Math.round(h * 0.56) + 'px -apple-system,"Segoe UI",Roboto,system-ui,sans-serif';
+        g.fillText('whish', 48, cy + 2);
+      }
+      g.fillStyle = '#18181b';
+      g.textAlign = 'right';
+      g.font = '700 ' + Math.round(h * 0.2) + 'px "Barlow Condensed",system-ui,sans-serif';
+      g.fillText('WHISH MONEY AGENT', w - 44, cy - 16);
+      g.globalAlpha = 0.7;
+      g.font = '600 ' + Math.round(h * 0.15) + 'px "Barlow Condensed",system-ui,sans-serif';
+      g.fillText('PAY · TOOLS · UPGRADES', w - 44, cy + 20);
+      g.globalAlpha = 1;
+    }
+    draw();
+    const t = finish(c);
+    t.wrapS = t.wrapT = T.ClampToEdgeWrapping;
+    if (typeof Image !== 'undefined') {
+      const tries = ['whish-logo.svg', 'whish-logo.png'];
+      (function next(i) {
+        if (i >= tries.length) return;
+        const img = new Image();
+        img.onload = function () { logo = img; draw(); t.needsUpdate = true; };
+        img.onerror = function () { next(i + 1); };
+        img.src = tries[i];
+      })(0);
+    }
+    if (typeof document !== 'undefined' && document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(function () { draw(); t.needsUpdate = true; }).catch(function () {});
+    }
+    return t;
+  }
+
   /* 1. grain: flat base + soft blotches + speckle. plaster / cement / sand   */
   function texGrain(o) {
     const S = o.size || 128, c = cv(S, S), g = c.getContext('2d'), rng = mulberry(o.seed || 7);
@@ -1929,6 +1981,16 @@
     m.prim(PRIM.torus, C0.NIGHT_TOP, KX - 3.7, 1.72, KZ + 1.3, 1.1, 1.1, 1.1, 0, 0.3, Math.PI * 0.5);
     mg.box(mixc(C0.SUN, C0.FOAM, 0.2, c), KX, 4.05, KZ + 1.9, 0.5, 0.26, 0.5);   // bare bulb
     coll(KX - 2.9, KZ - 2.4, KX + 2.9, KZ + 2.4, 4.4);
+
+    // the kiosk is a Whish Money point: its sign on the fascia, lit like a real one
+    const whMat = new T.MeshBasicMaterial({ map: texWhishSign() });
+    W.mats.push(whMat);
+    const whGeo = new T.PlaneGeometry(5.0, 0.78);
+    W.geos.push(whGeo);
+    const whSign = new T.Mesh(whGeo, whMat);
+    whSign.name = 'whishSign';
+    whSign.position.set(KX, 3.9, KZ + 2.465);
+    W.group.add(whSign);
 
     /* ---- the coffee / manakish cart with a striped awning ---- */
     const CX = -30.5, CZ = -8.0;

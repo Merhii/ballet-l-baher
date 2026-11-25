@@ -360,6 +360,8 @@ check('BLB_HUD.create', () => {
     { id: 'back', name: 'Stronger back', note: 'stamina 100 → 125', price: 200, disabled: true }
   ] });
   if (typeof hud.isShopOpen !== 'function' || !hud.isShopOpen()) throw new Error('kiosk did not open');
+  if (typeof hud.showReceipt !== 'function') throw new Error('missing hud.showReceipt');
+  hud.showReceipt({ amount: 60, to: 'El Muallim (agent)', what: 'Bigger wheelbarrow · level 2', balance: 40, ref: 'BLB-000123' });
   hud.closeShop();
   if (typeof hud.setPouch !== 'function') throw new Error('missing hud.setPouch');
   hud.setPouch({ slots: 2, items: [{ id: 'knefe', name: 'Knefe b jebne' }] });
