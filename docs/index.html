@@ -9933,6 +9933,13 @@
       return best;
     }
     var adCardOpen = false;
+    // what Umami gets about an ad: which one, whose, and which board it was on
+    var adViews = 0, AD_VIEW_CAP = 40;
+    function adData(b, ad) {
+      var d = { board: b.slot.id };
+      if (ad) { d.ad = ad.id; d.sponsor = ad.sponsor || ad.id; }
+      return d;
+    }
     function openBoard(b) {
       var vacant = !b.ad, ad = b.ad || HOUSE_AD;
       var image = '';
@@ -9943,10 +9950,13 @@
       releaseLook();
       hud.setPrompt(null);
       if (!vacant) ADS.bump(ad.id, 'open');
+      track(vacant ? 'ad-vacant-open' : 'ad-open', adData(b, vacant ? null : ad));
       sfx.ui();
       hud.showAdCard({
         image: image, sponsor: ad.sponsor, headline: ad.headline, tagline: ad.tagline,
         url: vacant ? '' : ad.url, cta: ad.cta, mail: vacant ? HOUSE_AD.mail : '', vacant: vacant,
+        // the link out: a sponsor's site, or for an empty board an enquiry to rent it
+        onVisit: function () { track(vacant ? 'ad-vacant-enquiry' : 'ad-click', adData(b, vacant ? null : ad)); },
         onClose: function () {
           adCardOpen = false;
           paused = false;
@@ -9981,7 +9991,11 @@
           var vis = boardV.z < 1 && Math.abs(boardV.x) < 0.95 && Math.abs(boardV.y) < 0.95 &&
             dist < 34 * Math.max(b.slot.w / 8, 1);
           b.seen = vis ? b.seen + dt : 0;
-          if (b.seen > 1.2 && S.started) { b.counted = true; ADS.bump(b.ad.id); }
+          if (b.seen > 1.2 && S.started) {
+            b.counted = true; ADS.bump(b.ad.id);
+            // capped per visit so a long session cannot eat the Umami allowance
+            if (adViews++ < AD_VIEW_CAP) track('ad-view', adData(b, b.ad));
+          }
         }
       }
     }
