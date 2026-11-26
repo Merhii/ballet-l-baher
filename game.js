@@ -1254,6 +1254,10 @@
       tiles.add(cellTmp.i, cellTmp.j, 0);
       noteBest();
       achieve('first');
+      track('first-balata', { device: IS_TOUCH ? 'touch' : 'desktop' }, 'first-balata');
+      for (var mi = 0; mi < MILESTONES.length; mi++) {
+        if (sim.count * 4 >= MILESTONES[mi]) track('metres', { m: MILESTONES[mi] }, 'm' + MILESTONES[mi]);
+      }
       if (S.phase === 'night') achieve('night');
       if (sim.count * 4 >= 100) achieve('m100');
       if (sim.count * 4 >= 400) achieve('m400');
@@ -1846,6 +1850,7 @@
       var near = nearestNPC();
       if (!near || near.dist > HIT_REACH) { sfx.ui(); return false; }
       var npc = near.npc;
+      track('hit', { who: npc.def.name, device: IS_TOUCH ? 'touch' : 'desktop' }, 'hit');
       S.health = Math.max(0, S.health - HIT_COST);
       var dx = npc.pos.x - body.pos.x, dz = npc.pos.z - body.pos.z;
       var d = Math.sqrt(dx * dx + dz * dz) || 1;
@@ -2174,6 +2179,7 @@
       S.fainted = 4.2;
       S.faints++;
       achieve('faint');
+      track('faint', { cause: S.faintCause || 'starve', m: sim.count * 4 });
       placing = false; keys = {};
       var bill = Math.min(Math.floor(S.lira), 20 + Math.round(S.lira * 0.15));
       S.lira -= bill;
@@ -2365,11 +2371,21 @@
       for (var i = 0; i < ACHIEVEMENTS.length; i++) if (ACHIEVEMENTS[i].id === id) return ACHIEVEMENTS[i];
       return null;
     }
+    /* Umami custom events (the script is only on the live site; elsewhere
+       window.umami is missing and this does nothing). Kept to moments, never
+       per frame or per tile, so the monthly event allowance lasts. */
+    var tracked = {};
+    function track(name, data, once) {
+      if (once) { if (tracked[once]) return; tracked[once] = 1; }
+      try { if (window.umami && window.umami.track) window.umami.track(name, data); } catch (e) { /* ignore */ }
+    }
+    var MILESTONES = [20, 50, 100, 200, 400, 800, 1600];
     function achieve(id) {
       if (ach.got[id] || !S.started) return;
       var a = achById(id);
       if (!a) return;
       ach.got[id] = Date.now();
+      track('achievement', { id: id });
       achDirty = true; saveAch();
       if (hud.achievement) hud.achievement({ name: a.name, ar: a.ar, how: a.how });
       else hud.toast('Achievement: ' + a.name, 'good');
@@ -2451,7 +2467,7 @@
     function onMenu(act, v) {
       sfx.unlock();
       if (act === 'continue') { hud.hideMenu(); start(); if (firstPerson) requestLook(); }
-      else if (act === 'new') { resetGame(); hud.hideMenu(); start(); if (firstPerson) requestLook(); }
+      else if (act === 'new') { track('new-game', { m: sim.count * 4 }); resetGame(); hud.hideMenu(); start(); if (firstPerson) requestLook(); }
       else if (act === 'resume') resume();
       else if (act === 'pause') pause();
       else if (act === 'quit') quitToMenu();
@@ -2537,6 +2553,7 @@
       var oldMax = S.staminaMax;
       applyUpgrades();
       if (id === 'back') S.health = Math.min(S.staminaMax, S.health + (S.staminaMax - oldMax));
+      track('upgrade', { id: id, level: lvl + 1, price: price });
       sfx.purchase();
       hud.toast('Whish · ' + u.name + ' level ' + (lvl + 2) + ' · −' + price + ' l.l.', 'good');
       if (muallim) npcSay(muallim, 'sold');
@@ -2650,6 +2667,8 @@
       clock.getDelta();
       if (!startedOnce) {
         startedOnce = true;
+        track('game-start', { device: IS_TOUCH ? 'touch' : 'desktop', returning: hasSave ? 'yes' : 'no',
+                              view: firstPerson ? 'first' : 'third' });
         hud.toast(IS_TOUCH
           ? 'Drag to look. Hold SHOVEL at a pile, then tap بلّط.'
           : 'Click to capture the mouse. Hold E at a pile for mouna. Esc pauses.', 'info');
