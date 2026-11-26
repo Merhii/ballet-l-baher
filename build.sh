@@ -48,6 +48,15 @@ if os.path.exists(THREE_SRC):
     # where the game lives: link previews need absolute URLs. Change here for a new domain.
     site = 'https://balletlba7er.com/'
     og_title = u'Ballet l Ba7er — بلّط البحر'
+    # Umami visitor stats (no cookies). Paste the website ID from the Umami
+    # dashboard; empty means no tracking script is added. data-domains keeps
+    # localhost and file:// test runs out of the numbers.
+    UMAMI_ID = 'cced7f31-6f7d-4f6a-a614-279b909d1dc3'
+    UMAMI_SRC = 'https://cloud.umami.is/script.js'
+    umami = ''
+    if UMAMI_ID:
+        umami = ('<script defer src="' + UMAMI_SRC + '" data-website-id="' + UMAMI_ID
+                 + '" data-domains="' + site.split('//', 1)[1].strip('/') + '"></script>')
     head = (
         '<meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">'
@@ -77,7 +86,7 @@ if os.path.exists(THREE_SRC):
         '<meta name="apple-mobile-web-app-capable" content="yes">'
         '<meta name="apple-mobile-web-app-title" content="Ballet l Ba7er">'
         '<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">'
-        + HEAD_RESET)
+        + umami + HEAD_RESET)
     page = ('<!doctype html><html lang="en"><head>' + head + '</head><body>'
             + body + '</body></html>')
     if not os.path.isdir('dist/standalone'):
