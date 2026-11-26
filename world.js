@@ -143,7 +143,7 @@
          brand's red, its own logo file when the page ships one (whish-logo.svg
          or .png next to the page), a plain text wordmark until then. */
   function texWhishSign() {
-    const w = 1024, h = 160, RED = '#E30613';
+    const w = 1024, h = 160, RED = '#FF003E';
     const c = cv(w, h), g = c.getContext('2d');
     let logo = null;
     function draw() {
@@ -166,7 +166,7 @@
       g.fillStyle = '#18181b';
       g.textAlign = 'right';
       g.font = '700 ' + Math.round(h * 0.2) + 'px "Barlow Condensed",system-ui,sans-serif';
-      g.fillText('WHISH MONEY AGENT', w - 44, cy - 16);
+      g.fillText(logo ? 'AUTHORISED AGENT' : 'WHISH MONEY AGENT', w - 44, cy - 16);
       g.globalAlpha = 0.7;
       g.font = '600 ' + Math.round(h * 0.15) + 'px "Barlow Condensed",system-ui,sans-serif';
       g.fillText('PAY · TOOLS · UPGRADES', w - 44, cy + 20);

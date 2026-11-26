@@ -464,7 +464,7 @@
 '  justify-content:center;padding:18px 12px;pointer-events:auto;',
 '  background:radial-gradient(120% 90% at 50% 40%,rgba(22,112,140,.55),rgba(11,58,79,.88));}',
 '.blb-shop.on{display:flex;}',
-'.blb-whish{--wh-red:#E30613;--wh-red-dk:#A8000F;--wh-ink:#18181b;--wh-mute:#6b6b74;',
+'.blb-whish{--wh-red:#FF003E;--wh-red-dk:#C70031;--wh-ink:#18181b;--wh-mute:#6b6b74;',
 '  --wh-bg:#f3f3f5;--wh-line:#e4e4e8;position:relative;display:flex;flex-direction:column;',
 '  width:min(360px,100%);height:min(700px,calc(100vh - 36px));height:min(700px,calc(100dvh - 36px));',
 '  overflow:hidden;border-radius:34px;border:9px solid #101014;background:var(--wh-bg);',

@@ -2138,7 +2138,7 @@
          brand's red, its own logo file when the page ships one (whish-logo.svg
          or .png next to the page), a plain text wordmark until then. */
   function texWhishSign() {
-    const w = 1024, h = 160, RED = '#E30613';
+    const w = 1024, h = 160, RED = '#FF003E';
     const c = cv(w, h), g = c.getContext('2d');
     let logo = null;
     function draw() {
@@ -2161,7 +2161,7 @@
       g.fillStyle = '#18181b';
       g.textAlign = 'right';
       g.font = '700 ' + Math.round(h * 0.2) + 'px "Barlow Condensed",system-ui,sans-serif';
-      g.fillText('WHISH MONEY AGENT', w - 44, cy - 16);
+      g.fillText(logo ? 'AUTHORISED AGENT' : 'WHISH MONEY AGENT', w - 44, cy - 16);
       g.globalAlpha = 0.7;
       g.font = '600 ' + Math.round(h * 0.15) + 'px "Barlow Condensed",system-ui,sans-serif';
       g.fillText('PAY · TOOLS · UPGRADES', w - 44, cy + 20);
@@ -5586,7 +5586,7 @@
 '  justify-content:center;padding:18px 12px;pointer-events:auto;',
 '  background:radial-gradient(120% 90% at 50% 40%,rgba(22,112,140,.55),rgba(11,58,79,.88));}',
 '.blb-shop.on{display:flex;}',
-'.blb-whish{--wh-red:#E30613;--wh-red-dk:#A8000F;--wh-ink:#18181b;--wh-mute:#6b6b74;',
+'.blb-whish{--wh-red:#FF003E;--wh-red-dk:#C70031;--wh-ink:#18181b;--wh-mute:#6b6b74;',
 '  --wh-bg:#f3f3f5;--wh-line:#e4e4e8;position:relative;display:flex;flex-direction:column;',
 '  width:min(360px,100%);height:min(700px,calc(100vh - 36px));height:min(700px,calc(100dvh - 36px));',
 '  overflow:hidden;border-radius:34px;border:9px solid #101014;background:var(--wh-bg);',
