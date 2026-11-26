@@ -1611,14 +1611,15 @@
           '(more stamina, tires slower) and a food pouch. With a pouch, food you buy while full ' +
           'goes in it; eat it anywhere with ' + K('Q') + '.</p>' +
           '<h4>Manners</h4>' +
-          '<p>You can hit people with ' + K('F') + '. They will not like it: nobody sells to you or ' +
+          '<p>You can hit people: ' + K('CLICK') + ' while looking at someone close (' +
+          '<b>HIT</b> on a phone). They will not like it: nobody sells to you or ' +
           'helps you for a while, and the older men hit back.</p>' +
           '<h4>Controls</h4><div class="keys">' +
           '<div>' + K('WASD') + ' walk</div><div>' + K('SHIFT') + ' run</div>' +
           '<div>' + K('SPACE') + ' jump</div><div>' + K('CLICK') + ' lay a balata</div>' +
           '<div>' + K('HOLD CLICK') + ' lay a row</div><div>' + K('HOLD E') + ' shovel mouna</div>' +
           '<div>' + K('E') + ' talk / buy food / kiosk / billboard</div><div>' + K('V') + ' first / third person</div>' +
-          '<div>' + K('Q') + ' eat from the pouch</div><div>' + K('F') + ' hit someone</div>' +
+          '<div>' + K('Q') + ' eat from the pouch</div><div>' + K('CLICK') + ' on someone close: hit</div>' +
           '<div>' + K('[') + K(']') + ' mouse sensitivity</div><div>' + K('M') + ' sound</div>' +
           '<div>' + K('ESC') + ' pause menu</div><div>' + K('SCROLL') + ' zoom</div>' +
           '</div></div>' + back;

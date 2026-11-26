@@ -6733,14 +6733,15 @@
           '(more stamina, tires slower) and a food pouch. With a pouch, food you buy while full ' +
           'goes in it; eat it anywhere with ' + K('Q') + '.</p>' +
           '<h4>Manners</h4>' +
-          '<p>You can hit people with ' + K('F') + '. They will not like it: nobody sells to you or ' +
+          '<p>You can hit people: ' + K('CLICK') + ' while looking at someone close (' +
+          '<b>HIT</b> on a phone). They will not like it: nobody sells to you or ' +
           'helps you for a while, and the older men hit back.</p>' +
           '<h4>Controls</h4><div class="keys">' +
           '<div>' + K('WASD') + ' walk</div><div>' + K('SHIFT') + ' run</div>' +
           '<div>' + K('SPACE') + ' jump</div><div>' + K('CLICK') + ' lay a balata</div>' +
           '<div>' + K('HOLD CLICK') + ' lay a row</div><div>' + K('HOLD E') + ' shovel mouna</div>' +
           '<div>' + K('E') + ' talk / buy food / kiosk / billboard</div><div>' + K('V') + ' first / third person</div>' +
-          '<div>' + K('Q') + ' eat from the pouch</div><div>' + K('F') + ' hit someone</div>' +
+          '<div>' + K('Q') + ' eat from the pouch</div><div>' + K('CLICK') + ' on someone close: hit</div>' +
           '<div>' + K('[') + K(']') + ' mouse sensitivity</div><div>' + K('M') + ' sound</div>' +
           '<div>' + K('ESC') + ' pause menu</div><div>' + K('SCROLL') + ' zoom</div>' +
           '</div></div>' + back;
@@ -8797,7 +8798,6 @@
       if (c === 'KeyE' && !was && S.started) {
         if (interact()) return;
       }
-      if (c === 'KeyF' && !was && S.started) { hitNPC(); return; }
       if (c === 'KeyQ' && !was && S.started) { eatFromPouch(); return; }
       if (c === 'KeyV') setView(!firstPerson);
       if (c === 'BracketLeft') { setSens(look.sens * 0.84); return; }
@@ -8845,6 +8845,9 @@
            which only removes the cursor and the screen-edge limit. */
         requestLook();
       }
+      // left click on someone within reach and in front of you hits them
+      // instead of laying (phones have the HIT button for this)
+      if (e.pointerType === 'mouse' && e.button === 0 && npcInFront()) { hitNPC(); return; }
       placing = true; placeId = e.pointerId;
       // third person on a touch screen aims where the finger is
       mouseNDC.x = (e.clientX / window.innerWidth) * 2 - 1;
@@ -9142,7 +9145,7 @@
             : (who.npc.def.ferryTo ? 'boat back to the corniche · free'
               : (who.npc.def.shop ? 'Whish Money · upgrades' : 'talk to ' + who.npc.def.name)));
         if (who.npc.anger > 0) label = who.npc.def.name + ' is angry with you';
-        hud.setPrompt(IS_TOUCH ? label : 'E — ' + label + (who.dist <= HIT_REACH ? ' · F — hit' : ''));
+        hud.setPrompt(IS_TOUCH ? label : 'E — ' + label + (who.dist <= HIT_REACH ? ' · click — hit' : ''));
       } else if (pile && keys.KeyE) {
         if (S.mortar >= S.mortarMax) {
           hud.setPrompt('barrow full — go tile the sea');
@@ -9653,6 +9656,17 @@
       hud.say(npc.def.id, { name: npc.def.name, text: line.t, ar: line.ar });
       sfx.say(npc.def.voice);
       npc.cool = 14 + Math.random() * 10;
+    }
+    // the nearest person if they are in hitting reach and roughly where the
+    // camera looks (within ~40 degrees), so a click beside them still lays
+    function npcInFront() {
+      if (!S.started || S.fainted || ferrying) return null;
+      var near = nearestNPC();
+      if (!near || near.dist > HIT_REACH) return null;
+      var dx = near.npc.pos.x - body.pos.x, dz = near.npc.pos.z - body.pos.z;
+      var d = Math.sqrt(dx * dx + dz * dz) || 1;
+      var fwd = (-Math.sin(cam.yaw) * dx - Math.cos(cam.yaw) * dz) / d;
+      return fwd > 0.75 ? near.npc : null;
     }
     function hitNPC() {
       if (!S.started || S.fainted || ferrying || hitCool > 0) return false;

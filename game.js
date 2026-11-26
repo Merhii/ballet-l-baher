@@ -967,7 +967,6 @@
       if (c === 'KeyE' && !was && S.started) {
         if (interact()) return;
       }
-      if (c === 'KeyF' && !was && S.started) { hitNPC(); return; }
       if (c === 'KeyQ' && !was && S.started) { eatFromPouch(); return; }
       if (c === 'KeyV') setView(!firstPerson);
       if (c === 'BracketLeft') { setSens(look.sens * 0.84); return; }
@@ -1015,6 +1014,9 @@
            which only removes the cursor and the screen-edge limit. */
         requestLook();
       }
+      // left click on someone within reach and in front of you hits them
+      // instead of laying (phones have the HIT button for this)
+      if (e.pointerType === 'mouse' && e.button === 0 && npcInFront()) { hitNPC(); return; }
       placing = true; placeId = e.pointerId;
       // third person on a touch screen aims where the finger is
       mouseNDC.x = (e.clientX / window.innerWidth) * 2 - 1;
@@ -1312,7 +1314,7 @@
             : (who.npc.def.ferryTo ? 'boat back to the corniche · free'
               : (who.npc.def.shop ? 'Whish Money · upgrades' : 'talk to ' + who.npc.def.name)));
         if (who.npc.anger > 0) label = who.npc.def.name + ' is angry with you';
-        hud.setPrompt(IS_TOUCH ? label : 'E — ' + label + (who.dist <= HIT_REACH ? ' · F — hit' : ''));
+        hud.setPrompt(IS_TOUCH ? label : 'E — ' + label + (who.dist <= HIT_REACH ? ' · click — hit' : ''));
       } else if (pile && keys.KeyE) {
         if (S.mortar >= S.mortarMax) {
           hud.setPrompt('barrow full — go tile the sea');
@@ -1823,6 +1825,17 @@
       hud.say(npc.def.id, { name: npc.def.name, text: line.t, ar: line.ar });
       sfx.say(npc.def.voice);
       npc.cool = 14 + Math.random() * 10;
+    }
+    // the nearest person if they are in hitting reach and roughly where the
+    // camera looks (within ~40 degrees), so a click beside them still lays
+    function npcInFront() {
+      if (!S.started || S.fainted || ferrying) return null;
+      var near = nearestNPC();
+      if (!near || near.dist > HIT_REACH) return null;
+      var dx = near.npc.pos.x - body.pos.x, dz = near.npc.pos.z - body.pos.z;
+      var d = Math.sqrt(dx * dx + dz * dz) || 1;
+      var fwd = (-Math.sin(cam.yaw) * dx - Math.cos(cam.yaw) * dz) / d;
+      return fwd > 0.75 ? near.npc : null;
     }
     function hitNPC() {
       if (!S.started || S.fainted || ferrying || hitCool > 0) return false;
