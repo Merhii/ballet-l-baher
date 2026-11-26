@@ -1,0 +1,23 @@
+{
+  "name": "blb-promo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "studio": "remotion studio src/index.ts",
+    "render": "node render.mjs"
+  },
+  "dependencies": {
+    "@remotion/cli": "^4.0.547",
+    "@remotion/google-fonts": "^4.0.547",
+    "@remotion/media-utils": "^4.0.547",
+    "@remotion/transitions": "^4.0.547",
+    "puppeteer-core": "^24.43.1",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "remotion": "^4.0.547"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.3",
+    "typescript": "^7.0.2"
+  }
+}

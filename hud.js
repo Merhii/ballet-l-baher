@@ -1603,7 +1603,7 @@
           K('E') + '. Sahet el Qal3a by the castle opens soon.</p>' +
           '<h4>Jazirat Ziri</h4>' +
           '<p>The island off the corniche. Abou Ali waits with his boat at the foot of the Souk el Akel ' +
-          'stairs and takes you out for 10 lira; his son Ali brings you back for free. Or swim, if you ' +
+          'stairs and takes you out for 10 lira; Turyaki brings you back for free. Or swim, if you ' +
           'have the stamina.</p>' +
           '<h4>El Muallim\'s kiosk</h4>' +
           '<p>El Muallim stands by the kiosk on the corniche. Press ' + K('E') + ' beside him for ' +

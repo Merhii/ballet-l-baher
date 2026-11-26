@@ -102,11 +102,15 @@
              { t: 'Zedtellak festo2. Ma t2oul la 7ada.', ar: 'فستق زيادة' }],
       pricey: [{ t: '3ashra lira. Ballet shwayy w rja3.', ar: 'عشر ليرات' }],
       full: [{ t: 'Khalas, kelt helou kfeye. Rou7 shtghol.', ar: 'كلت كفاية' }] } },
-    soubras: { name: 'Soubras', voice: 2, hat: 'cap', shirt: 0x0b3a4f, hatCol: 0xf2b733, lines: {
+    soubras: { name: 'Soubras', voice: 2, hat: 'cap', shirt: 0x0b3a4f, hatCol: 0xf2b733,
+      // his line: most times he opens his mouth (greeting, chatting, selling)
+      catchphrase: { t: 'Jena nsewe jweneh, ma khalena l nakib!', ar: 'جينا نسوّي جوانح، ما خلّانا النقيب', p: 0.6,
+                     kinds: ['greet', 'idle', 'sold'] },
+      lines: {
       greet: [{ t: 'Sandwich? 3al nar, halla2.', ar: 'ساندويش؟' }],
       idle: [{ t: 'Ma bta3ref tballet 3a ma3de faadye.', ar: 'معدة فاضية' },
              { t: 'Toum? Akid toum.', ar: 'توم؟' },
-             { t: 'Jarbna n3ml jweneh, ma 3atena ezen l nakib!', ar: 'إذن النقيب' }],
+             ],
       sold: [{ t: 'Hay. Btedfik sa3a.', ar: 'بتدفّيك' },
              { t: 'Sa7tein. W ba3dén ballet.', ar: 'صحتين' }],
       pricey: [{ t: 'Tlétin lira ya 3ammi. Mesh balash.', ar: 'تلاتين ليرة' }],
@@ -1548,7 +1552,7 @@
     ];
 
     /* The boat to Jazirat Ziri: Abou Ali waits at the foot of the Souk el Akel
-       stairs and takes you out for a few lira; his son Ali waits on the Ziri
+       stairs and takes you out for a few lira; Turyaki waits on the Ziri
        jetty and brings you back for nothing. Invented people, like the rest of
        the corniche regulars. */
     var FERRY_PRICE = 10;
@@ -1570,7 +1574,7 @@
         }
       });
       NPC_DEFS.push({
-        id: 'ferry-ziri', name: 'Ali', voice: 2, hat: 'none', scale: 0.98,
+        id: 'ferry-ziri', name: 'Turyaki', voice: 2, hat: 'none', scale: 0.98,
         shirt: 0xf2b733, hatCol: 0x2b2420, yaw: 0, ferryTo: 'souk',
         at: function () { return ferry.ziri.man; },
         lines: {
@@ -1594,7 +1598,7 @@
           id: 'vendor-' + stall.id, name: v.name, voice: v.voice, hat: v.hat, scale: 1.0,
           shirt: v.shirt, hatCol: v.hatCol, yaw: 0, sells: stall.id, court: court.name,
           at: function () { return { x: stall.x, y: DECK_Y, z: stall.z - 3.1 }; },
-          lines: v.lines
+          lines: v.lines, catchphrase: v.catchphrase
         });
       });
     });
@@ -1626,7 +1630,8 @@
     function npcSay(npc, kind) {
       var pool = npc.def.lines[kind];
       if (!pool || !pool.length) return false;
-      var line = pick(pool);
+      var cp = npc.def.catchphrase;
+      var line = (cp && cp.kinds.indexOf(kind) >= 0 && Math.random() < cp.p) ? cp : pick(pool);
       var text = typeof line === 'string' ? line : line.t;
       var ar = typeof line === 'string' ? null : line.ar;
       text = String(text)
@@ -1774,7 +1779,7 @@
         cam.pitch = -0.05;
         if (sfx.splash) sfx.splash();
         hud.toast(to === 'ziri'
-          ? 'Jazirat Ziri. Ali brings you back for free.' + (paid ? ' −' + FERRY_PRICE + ' l.l.' : '')
+          ? 'Jazirat Ziri. Turyaki brings you back for free.' + (paid ? ' −' + FERRY_PRICE + ' l.l.' : '')
           : 'Back at the Souk el Akel stairs.', 'info');
         setTimeout(function () { fadeTo(false, 600); ferrying = false; }, 350);
       }, 650);
