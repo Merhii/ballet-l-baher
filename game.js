@@ -2484,7 +2484,8 @@
       freshStart();
       body.teleport(0, DECK_Y, -11);
       cam.yaw = Math.PI; cam.pitch = -0.06;
-      npcs.forEach(function (n2) { n2.talkIdx = 0; n2.greeted = false; });
+      npcs.forEach(function (n2) { n2.talkIdx = 0; n2.greeted = false; n2.anger = 0; n2.swing = 0; });
+      pushPouch();
       try { localStorage.removeItem(SAVE_KEY); } catch (e) { /* ignore */ }
       hasSave = false;
       pushStats();
@@ -2492,7 +2493,17 @@
     function onMenu(act, v) {
       sfx.unlock();
       if (act === 'continue') { hud.hideMenu(); start(); if (firstPerson) requestLook(); }
-      else if (act === 'new') { track('new-game', { m: sim.count * 4 }); resetGame(); hud.hideMenu(); start(); if (firstPerson) requestLook(); }
+      else if (act === 'new') {
+        track('new-game', { m: sim.count * 4, from: paused ? 'pause' : 'menu' });
+        resetGame();
+        hud.hideMenu();
+        // from the pause menu the game is still running underneath: unpause
+        // it rather than start it, which would do nothing
+        if (paused) { paused = false; clock.getDelta(); updateHint(); }
+        else start();
+        hud.toast('A fresh, untiled sea. Yalla.', 'info');
+        if (firstPerson) requestLook();
+      }
       else if (act === 'resume') resume();
       else if (act === 'pause') pause();
       else if (act === 'quit') quitToMenu();

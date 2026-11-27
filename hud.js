@@ -1740,7 +1740,8 @@
         openSheet(sheetName === act ? '' : act);
         return;
       }
-      if (act === 'new' && menuState.hasSave) { openSheet('confirm-new'); return; }
+      // always ask before throwing a sea away: mid-game, or a saved one
+      if (act === 'new' && (menuState.mode === 'pause' || menuState.hasSave)) { openSheet('confirm-new'); return; }
       if (act === 'share') { share(); onMenu('share'); return; }
       if (act === 'install') {
         if (PWA.prompt) {
@@ -1771,7 +1772,6 @@
       intro.setAttribute('data-mode', m);
       menuBtns['continue'].hidden = m !== 'main';
       menuBtns.resume.hidden = m !== 'pause';
-      menuBtns['new'].hidden = m !== 'main';
       menuBtns.credits.hidden = m !== 'main';
       menuBtns.quit.hidden = m !== 'pause';
       const cont = menuBtns['continue'];
@@ -1779,8 +1779,14 @@
       cont.querySelector('.s').textContent = menuState.hasSave
         ? 'continue your stretch of sea' : 'start tiling the sea';
       cont.querySelector('.a').textContent = menuState.hasSave ? 'كمّل' : 'ابدأ';
-      // "new game" is only worth showing when there is something to throw away
-      if (!menuState.hasSave) menuBtns['new'].hidden = true;
+      // "new game" is only worth showing when there is something to throw away:
+      // always while paused, and on the main menu when there is a save. In the
+      // pause menu it reads as "start over".
+      const nb = menuBtns['new'];
+      nb.hidden = m === 'pause' ? false : !menuState.hasSave;
+      nb.querySelector('.l').firstChild.textContent = m === 'pause' ? 'Start over' : 'Balle4 men jdid';
+      nb.querySelector('.s').textContent = m === 'pause'
+        ? 'balle4 men jdid — a fresh, untiled sea' : 'new game — a fresh, untiled sea';
       const s = menuState.summary;
       let cells = '';
       if (s && (s.tiles || s.lira || s.laid)) {
