@@ -513,11 +513,15 @@
 
     // ---- simulation + scenery + hud
     var waves = BLB_PHYSICS.createWaveField({ seed: 7 });
-    var sim = BLB_PHYSICS.createTileSim({ waves: waves, tiers: TIERS });
     // world.js builds THREE.Colors from CSS strings, so it gets PCSS, not the
     // numeric table our own materials use.
     // passing `scene` lets world.js install its fog and add its own group
     var world = BLB_WORLD.createWorld(THREE, { palette: PCSS, scene: scene });
+    // the castle islet, the causeway and Ziri are land: tiles rest against them
+    var sim = BLB_PHYSICS.createTileSim({
+      waves: waves, tiers: TIERS,
+      isLand: world.isLandAt ? function (x, z) { return world.isLandAt(x, z, 0.6); } : null
+    });
     if (world.group.parent !== scene) scene.add(world.group);
     if (world.fog) scene.fog = world.fog;
     scene.add(camera);        // so the first-person viewmodel renders
@@ -1227,6 +1231,7 @@
         var zx = cellCentreX(i), zz = cellCentreZ(j);
         if (zx > zr.x1 - 1 && zx < zr.x2 + 1 && zz > zr.z1 - 1 && zz < zr.z2 + 1) return 'that is Ziri — already land';
       }
+      if (sim.isLand && sim.isLand(i, j)) return 'that is the castle rock — tile round it';
       if (sim.get(i, j)) return 'already tiled';
       if (!sim.isSupported(i, j)) return 'nothing to rest it on';
       if (S.mortar < TIERS[tierIdx].mortar) return 'no mouna left';
@@ -2368,7 +2373,8 @@
       { id: 'wall',   name: 'Ma fi chi',        ar: 'ما في شي',    how: 'Climb the sea wall out of the water' },
       { id: 'night',  name: 'Bel lél',          ar: 'بالليل',      how: 'Lay a tile at night' },
       { id: 'ziri',   name: 'Wselna 3al jazira', ar: 'وصلنا عالجزيرة', how: 'Set foot on Jazirat Ziri' },
-      { id: 'brawl',  name: 'Ma bta3ref tetkhena2', ar: 'ما بتعرف تتخانق', how: 'Get hit back on the corniche' }
+      { id: 'brawl',  name: 'Ma bta3ref tetkhena2', ar: 'ما بتعرف تتخانق', how: 'Get hit back on the corniche' },
+      { id: 'qalaa',  name: 'Fo2 el qal3a',     ar: 'فوق القلعة',   how: 'Climb to the roof of the sea castle' }
     ];
     var ACH_KEY = 'blb.ach';
     var ach = { got: {}, n: { mouna: 0, knefe: 0 }, ate: {} };
@@ -2845,6 +2851,10 @@
       var zi = world.ziri;
       if (zi && body.grounded && !body.inWater && body.pos.y > 0.2 &&
           body.pos.x > zi.x1 && body.pos.x < zi.x2 && body.pos.z > zi.z1 && body.pos.z < zi.z2) achieve('ziri');
+      // on the roof of the sea castle's keep, by the flag
+      var ct = world.castleTop;
+      if (ct && body.grounded && body.pos.y > ct.y - 0.3 &&
+          Math.abs(body.pos.x - ct.x) < ct.r + 1 && Math.abs(body.pos.z - ct.z) < ct.r + 1) achieve('qalaa');
       S.wasInWater = body.inWater;
 
       // stamina drains by what you are actually doing

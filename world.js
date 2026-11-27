@@ -495,6 +495,40 @@
       x2: Math.max(x1, x2), z2: Math.max(z1, z2), top: top
     });
   }
+  /* A box turned by `ang` (three.js rotation.y) about its centre, for the
+     physics, which only knows axis-aligned boxes: cut into pieces no longer
+     than `piece` and push each piece's bounding box. The pieces overshoot the
+     true faces by a hand's width, which nobody notices on a wall or a floor.
+     `bottom` (optional) lets a floor hang overhead without blocking. */
+  function collTurned(cx, cz, hx, hz, ang, top, bottom, piece) {
+    piece = piece || 0.7;
+    const nx = Math.max(1, Math.ceil(hx * 2 / piece)), nz = Math.max(1, Math.ceil(hz * 2 / piece));
+    const px = hx / nx, pz = hz / nz, ca = Math.cos(ang), sa = Math.sin(ang);
+    const ex = px * Math.abs(ca) + pz * Math.abs(sa), ez = px * Math.abs(sa) + pz * Math.abs(ca);
+    for (let i = 0; i < nx; i++) {
+      for (let j = 0; j < nz; j++) {
+        const u = -hx + px * (2 * i + 1), v = -hz + pz * (2 * j + 1);
+        const x = cx + u * ca + v * sa, z = cz - u * sa + v * ca;
+        const b = { x1: x - ex, z1: z - ez, x2: x + ex, z2: z + ez, top: top };
+        if (typeof bottom === 'number') b.bottom = bottom;
+        W.coll.push(b);
+      }
+    }
+  }
+  /* Ground the sea already has: tiles may not go there, and a tile next to it
+     rests against it like it rests against the shore. Turned rectangles. */
+  function landRect(cx, cz, hx, hz, ang) {
+    W.land.push({ cx: cx, cz: cz, hx: hx, hz: hz, c: Math.cos(ang), s: Math.sin(ang) });
+  }
+  function isLandAt(x, z, pad) {
+    pad = pad || 0;
+    for (let n = 0; n < W.land.length; n++) {
+      const r = W.land[n], dx = x - r.cx, dz = z - r.cz;
+      const u = dx * r.c - dz * r.s, v = dx * r.s + dz * r.c;   // into the rect's own frame
+      if (Math.abs(u) <= r.hx + pad && Math.abs(v) <= r.hz + pad) return true;
+    }
+    return false;
+  }
   /* an InstancedMesh with per-instance colour jitter (kills the cloned look) */
   function instanced(geo, mat, xforms, tintBase, jitterAmt, name) {
     const im = new T.InstancedMesh(geo, mat, xforms.length);
@@ -1187,8 +1221,16 @@
   function buildCastle() {
     const C0 = W.COL, rng = mulberry(5150), c = new T.Color();
     const cg = new T.Group();
-    cg.position.set(-86, 0, 30);
-    cg.rotation.y = -0.22;
+    const CX = -86, CZ = 30, CR = -0.22;
+    cg.position.set(CX, 0, CZ);
+    cg.rotation.y = CR;
+    // the castle's own frame -> world, for colliders laid out in castle terms
+    const CC = Math.cos(CR), CS = Math.sin(CR);
+    const cwx = function (x, z) { return CX + x * CC + z * CS; };
+    const cwz = function (x, z) { return CZ - x * CS + z * CC; };
+    const cbox = function (x, z, hx, hz, top, bottom, piece) {
+      collTurned(cwx(x, z), cwz(x, z), hx, hz, CR, top, bottom, piece);
+    };
 
     /* --- rock islet --------------------------------------------------------- */
     const mr = new Mesher();
@@ -1204,7 +1246,9 @@
         rng(), rng() * TAU, rng(), 1 / 10);
     }
     cg.add(bake(mr, W.MAT.rock, 'castleIslet'));
-    coll(-104, 12, -68, 48, 3.4);
+    // the rock you can stand on is the top stratum, not its bounding box
+    cbox(0, 0, 16.0, 12.3, 3.4, undefined, 3.0);
+    landRect(CX, CZ, 16.5, 12.8, CR);
 
     /* --- masonry: plinth, curtain wall, towers ------------------------------ */
     const mm = new Mesher(), mg = new Mesher(), mf = new Mesher();
@@ -1213,6 +1257,9 @@
     mm.box(vary(stoneA, rng, 0.07, c), 0, PL + 0.5, 0, 27, 1.6, 20.5, 0, 0, 0, 1 / 6);  // plinth
     // courtyard floor
     mm.box(mixc(C0.LIMESTONE, C0.CEMENT, 0.3, c), 0, PL + 1.35, 0, 22, 0.3, 15.5, 0, 0, 0, 1 / 6);
+    const FLOOR = PL + 1.5;                                    // 4.9: the courtyard
+    cbox(0, 0, 13.5, 10.25, PL + 1.3, undefined, 3.0);         // plinth ledge, 4.7
+    cbox(0, 0, 11.1, 8.1, FLOOR, undefined, 3.0);
 
     const WX = 12.2, WZ = 9.2, TH = 2.2;
     const runs = [
@@ -1241,7 +1288,10 @@
             0, (rng() - 0.5) * 0.02, (rng() - 0.5) * 0.015, 1 / 6);
         }
       }
-      merlons(mm, stoneA, r.x1, r.z1, r.x2, r.z2, WALL_TOP, 1.15, 1.25, TH * 0.72, rng);
+      // battlements on the outer edge only, so the wall walk stays clear
+      const mo = TH * 0.5 - 0.32;
+      merlons(mm, stoneA, r.x1 + r.n.x * mo, r.z1 + r.n.z * mo, r.x2 + r.n.x * mo, r.z2 + r.n.z * mo,
+        WALL_TOP, 1.15, 1.25, 0.62, rng);
       // arrow slits
       for (let i = 0; i < 5; i++) {
         const t = (i + 0.5) / 5;
@@ -1271,18 +1321,141 @@
         }
       }
     }
-    // the gate: round arch + heavy timber door, where the causeway lands
+    /* --- walls you cannot walk through, and a wall walk on top ------------- */
+    const HT = TH * 0.5, GATE = 2.95, PAR = WALL_TOP + 1.25;
+    cbox(-(GATE + (WX + HT - GATE) * 0.5), -WZ, (WX + HT - GATE) * 0.5, HT, WALL_TOP);   // inshore, west of the gate
+    cbox(GATE + (WX + HT - GATE) * 0.5, -WZ, (WX + HT - GATE) * 0.5, HT, WALL_TOP);      // inshore, east of the gate
+    cbox(0, -WZ, GATE, HT, WALL_TOP, PL + 6.0);                                         // over the gate
+    cbox(0, WZ, WX + HT, HT, WALL_TOP);                                                  // seaward
+    cbox(-WX, 0, HT, WZ - HT, WALL_TOP);
+    cbox(WX, 0, HT, WZ - HT, WALL_TOP);
+    // the battlements as a parapet along each outer edge
+    cbox(0, -WZ - HT + 0.31, WX + HT, 0.31, PAR, WALL_TOP - 0.1);
+    cbox(0, WZ + HT - 0.31, WX + HT, 0.31, PAR, WALL_TOP - 0.1);
+    cbox(-WX - HT + 0.31, 0, 0.31, WZ + HT, PAR, WALL_TOP - 0.1);
+    cbox(WX + HT - 0.31, 0, 0.31, WZ + HT, PAR, WALL_TOP - 0.1);
+
+    // the gate: round arch, and the heavy timber doors standing open
     archXY(mm, vary(stoneA, rng, 0.08, c), 0, PL + 4.2, -WZ, 2.5, 0.8, TH * 1.15, 9, rng, 0.2);
-    mf.box(mixc(C0.TRUNK, C0.RUST, 0.3, c), 0, PL + 2.6, -WZ - 0.1, 4.4, 5.0, 0.3);
-    for (let i = 0; i < 5; i++) {
-      mf.box(shade(C0.TRUNK, -0.16, c), -1.7 + i * 0.85, PL + 2.6, -WZ - 0.28, 0.7, 4.9, 0.14);
+    for (let side = -1; side <= 1; side += 2) {
+      const lx = side * 2.45, lz = -WZ + HT + 1.15;
+      mf.box(mixc(C0.TRUNK, C0.RUST, 0.3, c), lx, PL + 2.6, lz, 0.3, 5.0, 2.2);
+      for (let i = 0; i < 3; i++) {
+        mf.box(shade(C0.TRUNK, -0.16, c), lx - side * 0.18, PL + 2.6, lz - 0.75 + i * 0.75, 0.14, 4.9, 0.6);
+      }
+      cbox(lx, lz, 0.2, 1.1, PL + 5.1);
+    }
+
+    /* --- a stone stair up to the wall walk, against the inshore wall east of
+       the gate, turning at the corner up the east wall ----------------------- */
+    // 12 + landing + 10 risers of 0.28 take the 4.9 m floor to 11.34, a step
+    // below the 11.4 m wall top (the body steps up 0.38 m without a jump)
+    const RISE = 0.28, TREAD = 0.5, LANE = 1.5;
+    let sh = FLOOR;
+    for (let k = 0; k < 12; k++) {                       // leg 1: along the inshore wall, +x
+      sh += RISE;
+      const x = 3.5 + TREAD * (k + 0.5), z = -WZ + HT + LANE * 0.5;
+      mm.box(vary(stoneA, rng, 0.07, c), x, (FLOOR - 0.3 + sh) * 0.5, z, TREAD, sh - FLOOR + 0.3, LANE, 0, 0, 0, 1 / 6);
+      cbox(x, z, TREAD * 0.5, LANE * 0.5, sh);
+    }
+    sh += RISE;                                          // the corner landing
+    const cornX = WX - HT - LANE * 0.5;
+    mm.box(vary(stoneA, rng, 0.07, c), cornX, (FLOOR - 0.3 + sh) * 0.5, -WZ + HT + LANE * 0.5,
+      LANE, sh - FLOOR + 0.3, LANE, 0, 0, 0, 1 / 6);
+    cbox(cornX, -WZ + HT + LANE * 0.5, LANE * 0.5, LANE * 0.5, sh);
+    for (let k = 0; k < 10; k++) {                       // leg 2: up the east wall, +z
+      sh += RISE;
+      const x = cornX, z = -WZ + HT + LANE + TREAD * (k + 0.5);
+      mm.box(vary(stoneA, rng, 0.07, c), x, (FLOOR - 0.3 + sh) * 0.5, z, LANE, sh - FLOOR + 0.3, TREAD, 0, 0, 0, 1 / 6);
+      cbox(x, z, LANE * 0.5, TREAD * 0.5, sh);
     }
 
     /* --- the two squat towers ---------------------------------------------- */
+    /* Inside the keep: a floor, a stair round the inside walls (one and a
+       half laps: north, west, south, east, then north and west again, with a
+       landing in each corner), a roof with a hatch over the last flight, and
+       lamps. Walls, treads and roof are colliders; the treads above the first
+       flight are slabs you can walk under. All in the castle's frame. */
+    function buildKeepInside(tw, hw, hd) {
+      const x0 = KX0, x1 = KX1, z0 = KZ0, z1 = KZ1, L = 1.4, T = 0.5;
+      const RT = tw.top, RB = tw.top - 0.5;
+      // walls (the east one round the door), the floor, a lintel
+      cbox(tw.x, (tw.z - hd + z0) * 0.5, hw, (z0 - tw.z + hd) * 0.5, RT);
+      cbox(tw.x, (z1 + tw.z + hd) * 0.5, hw, (tw.z + hd - z1) * 0.5, RT);
+      cbox((tw.x - hw + x0) * 0.5, (z0 + z1) * 0.5, (x0 - tw.x + hw) * 0.5, (z1 - z0) * 0.5, RT);
+      const ewx = (x1 + tw.x + hw) * 0.5, ewh = (tw.x + hw - x1) * 0.5;
+      const dz0 = DOOR_Z - DOOR_HW, dz1 = DOOR_Z + DOOR_HW;
+      cbox(ewx, (z0 + dz0) * 0.5, ewh, (dz0 - z0) * 0.5, RT);
+      cbox(ewx, (dz1 + z1) * 0.5, ewh, (z1 - dz1) * 0.5, RT);
+      cbox(ewx, DOOR_Z, ewh, DOOR_HW, RT, DOOR_TOP);
+      cbox((x0 + x1) * 0.5, (z0 + z1) * 0.5, (x1 - x0) * 0.5, (z1 - z0) * 0.5, FLOOR);
+      mm.box(mixc(C0.LIMESTONE, C0.CEMENT, 0.35, c), (x0 + x1) * 0.5, FLOOR - 0.15, (z0 + z1) * 0.5,
+        x1 - x0, 0.3, z1 - z0, 0, 0, 0, 1 / 6);
+      mm.box(vary(stoneA, rng, 0.06, c), ewx, DOOR_TOP + 0.25, DOOR_Z, ewh * 2 + 0.3, 0.5, DOOR_HW * 2 + 0.6, 0, 0, 0, 1 / 6);
+
+      // the run: [lane, treads] with a corner landing after each. The NE
+      // corner stays floor: you walk into it from the door and turn west onto
+      // the first tread (coming at a flight from the side would put you
+      // against the second tread, a step too high)
+      const nN = Math.floor((x1 - x0 - 2 * L) / T), nW = Math.floor((z1 - z0 - 2 * L) / T);
+      const run = [['N', nN, x1 - L], ['W', nW], ['S', nN], ['E', nW], ['N', nN, x1 - L], ['W', nW]];
+      let risers = 0;
+      for (let i = 0; i < run.length; i++) risers += run[i][1] + 1;
+      const R = (RT - FLOOR) / risers;                    // ~0.24 m: under the body's step-up
+      const tread = function (x, z, hx, hz, top, solid) {
+        const bot = solid ? FLOOR - 0.05 : top - 0.45;
+        vary(mixc(stoneA, C0.CEMENT, 0.15, c), rng, 0.06, c);
+        mm.box(c, x, (top + bot) * 0.5, z, hx * 2, top - bot, hz * 2, 0, 0, 0, 1 / 6);
+        cbox(x, z, hx, hz, top, solid ? undefined : bot);
+      };
+      let h = FLOOR;
+      for (let i = 0; i < run.length; i++) {
+        const lane = run[i][0], n = run[i][1], first = i === 0;
+        // treads sized to fill the lane exactly: a gap before the landing is a
+        // hole the ledge guard will not let you step across
+        const span = (lane === 'N' || lane === 'S') ? (x1 - x0 - 2 * L) : (z1 - z0 - 2 * L), d = span / n;
+        for (let k = 0; k < n; k++) {
+          h += R;
+          if (lane === 'N') tread(run[i][2] - d * (k + 0.5), z0 + L * 0.5, d * 0.5, L * 0.5, h, first);
+          else if (lane === 'W') tread(x0 + L * 0.5, z0 + L + d * (k + 0.5), L * 0.5, d * 0.5, h, false);
+          else if (lane === 'S') tread(x0 + L + d * (k + 0.5), z1 - L * 0.5, d * 0.5, L * 0.5, h, false);
+          else tread(x1 - L * 0.5, z1 - L - d * (k + 0.5), L * 0.5, d * 0.5, h, false);
+        }
+        h += R;                                          // the landing at the end of the flight
+        const cx = (lane === 'N' || lane === 'W') ? x0 + L * 0.5 : x1 - L * 0.5;
+        const cz = (lane === 'W' || lane === 'S') ? z1 - L * 0.5 : z0 + L * 0.5;
+        tread(cx, cz, L * 0.5, L * 0.5, Math.min(h, RT), false);
+      }
+
+      // the roof covers everything but the west strip, where the last flight
+      // comes up; the battlements stand round the edge as a parapet
+      const roof = mixc(stoneA, C0.CEMENT, 0.2, c);
+      mm.box(vary(roof, rng, 0.05, c), (x0 + L + x1) * 0.5, (RT + RB) * 0.5, (z0 + z1) * 0.5,
+        x1 - x0 - L, RT - RB, z1 - z0, 0, 0, 0, 1 / 6);
+      cbox((x0 + L + x1) * 0.5, (z0 + z1) * 0.5, (x1 - x0 - L) * 0.5, (z1 - z0) * 0.5, RT, RB, 2.0);
+      const RP = RT + 1.3;
+      cbox(tw.x, tw.z - hd + 0.4, hw, 0.4, RP, RT - 0.1);
+      cbox(tw.x, tw.z + hd - 0.4, hw, 0.4, RP, RT - 0.1);
+      cbox(tw.x - hw + 0.4, tw.z, 0.4, hd, RP, RT - 0.1);
+      cbox(tw.x + hw - 0.4, tw.z, 0.4, hd, RP, RT - 0.1);
+      // lamps on the inside walls, lit at night
+      for (let i = 0; i < 3; i++) {
+        mg.box(mixc(C0.SUN, C0.TERRACOTTA, 0.3, c), x1 - 0.06, FLOOR + 2.4 + i * 3.6, z1 - 1.0 - i * 1.6, 0.12, 0.5, 0.35);
+      }
+      // where the game checks for "on top of the castle"
+      W.castleTop = { x: cwx(tw.x, tw.z), z: cwz(tw.x, tw.z), r: hw, y: RT };
+    }
+
     const towers = [
       { x: -8.6, z: -0.8, w: 10.0, d: 10.0, top: 17.2, dome: true },
       { x: 8.6, z: 2.4, w: 8.0, d: 8.0, top: 14.0, dome: false }
     ];
+    // the domed keep is hollow: a door from the courtyard, a stair round the
+    // inside walls, and a hatch onto the roof
+    // the keep's room, in the castle's frame: its west wall is thick enough to
+    // swallow the curtain wall that runs into it
+    const KX0 = -11.1, KX1 = -5.0, KZ0 = -4.4, KZ1 = 2.8;
+    const DOOR_Z = -0.8, DOOR_HW = 0.8, DOOR_TOP = FLOOR + 2.8;
     for (let ti = 0; ti < towers.length; ti++) {
       const tw = towers[ti];
       for (let y = PL + 0.8; y < tw.top; y += 1.15) {
@@ -1290,8 +1463,25 @@
         const taper = 1 + (1 - (y - PL) / (tw.top - PL)) * 0.05;
         vary(stoneA, rng, 0.1, c);
         if (y < PL + 2.4) mixc(c, C0.STONE_WET, 0.16, c);
-        mm.box(c, tw.x, y + h * 0.5, tw.z, tw.w * taper, h * 1.02, tw.d * taper,
-          0, (rng() - 0.5) * 0.02, 0, 1 / 6);
+        const cy = y + h * 0.5, jr = (rng() - 0.5) * 0.02;
+        if (!tw.dome) {
+          mm.box(c, tw.x, cy, tw.z, tw.w * taper, h * 1.02, tw.d * taper, 0, jr, 0, 1 / 6);
+          continue;
+        }
+        const ox0 = tw.x - tw.w * taper * 0.5, ox1 = tw.x + tw.w * taper * 0.5;
+        const oz0 = tw.z - tw.d * taper * 0.5, oz1 = tw.z + tw.d * taper * 0.5;
+        const wallBox = function (xa, xb, za, zb) {
+          mm.box(c, (xa + xb) * 0.5, cy, (za + zb) * 0.5, xb - xa, h * 1.02, zb - za, 0, 0, 0, 1 / 6);
+        };
+        wallBox(ox0, ox1, oz0, KZ0);                                   // north
+        wallBox(ox0, ox1, KZ1, oz1);                                   // south
+        wallBox(ox0, KX0, KZ0, KZ1);                                   // west
+        if (y < DOOR_TOP) {                                            // east, round the door
+          wallBox(KX1, ox1, KZ0, DOOR_Z - DOOR_HW);
+          wallBox(KX1, ox1, DOOR_Z + DOOR_HW, KZ1);
+        } else {
+          wallBox(KX1, ox1, KZ0, KZ1);
+        }
       }
       const hw = tw.w * 0.5, hd = tw.d * 0.5;
       merlons(mm, stoneA, tw.x - hw, tw.z - hd, tw.x + hw, tw.z - hd, tw.top, 1.1, 1.3, 1.5, rng);
@@ -1311,23 +1501,46 @@
         mg.box(mixc(C0.SUN, C0.FOAM, 0.25, c), tw.x - 2.6 + i * 2.6, PL + 8.2, tw.z - hd - 0.06, 0.8, 1.3, 0.12);
       }
       mg.box(mixc(C0.SUN, C0.FOAM, 0.25, c), tw.x + hw + 0.06, PL + 5.4, tw.z, 0.12, 1.2, 0.75);
-      coll(-86 + tw.x - hw, 30 + tw.z - hd, -86 + tw.x + hw, 30 + tw.z + hd, tw.top);
+      if (!tw.dome) cbox(tw.x, tw.z, hw, hd, tw.top);
+      else buildKeepInside(tw, hw, hd);
 
       if (tw.dome) {
         // small Ottoman-era domed cell on the roof
         const by = tw.top + 1.3;
-        mm.box(vary(mixc(C0.LIMESTONE, C0.FOAM, 0.2, c), rng, 0.05, c), tw.x, by, tw.z, 5.4, 2.6, 5.4, 0, 0.06, 0, 1 / 6);
-        mm.prim(PRIM.dome, mixc(C0.LIMESTONE, C0.CEMENT, 0.3, c), tw.x, by + 1.3, tw.z, 5.6, 3.4, 5.6, 0, 0.06, 0, 1 / 6);
-        mf.prim(PRIM.cone6, C0.RUST, tw.x, by + 4.9, tw.z, 0.4, 0.8, 0.4);
-        mg.box(mixc(C0.SUN, C0.TERRACOTTA, 0.2, c), tw.x, by + 0.2, tw.z - 2.75, 0.7, 1.0, 0.1);
+        // (clear of the stair's roof hatch along the west side)
+        mm.box(vary(mixc(C0.LIMESTONE, C0.FOAM, 0.2, c), rng, 0.05, c), tw.x + 1.0, by, tw.z - 0.8, 4.2, 2.6, 4.2, 0, 0.06, 0, 1 / 6);
+        mm.prim(PRIM.dome, mixc(C0.LIMESTONE, C0.CEMENT, 0.3, c), tw.x + 1.0, by + 1.3, tw.z - 0.8, 4.4, 3.0, 4.4, 0, 0.06, 0, 1 / 6);
+        cbox(tw.x + 1.0, tw.z - 0.8, 2.1, 2.1, tw.top + 2.6, tw.top - 0.1);
+        mf.prim(PRIM.cone6, C0.RUST, tw.x + 1.0, by + 4.5, tw.z - 0.8, 0.4, 0.8, 0.4);
+        mg.box(mixc(C0.SUN, C0.TERRACOTTA, 0.2, c), tw.x + 1.0, by + 0.2, tw.z - 2.95, 0.7, 1.0, 0.1);
       }
     }
     // a lean-to shed and some clutter in the courtyard
     mm.box(vary(stoneA, rng, 0.1, c), -2, PL + 2.6, 5.2, 5.0, 2.4, 3.4, 0, 0.1, 0, 1 / 6);
     mf.box(mixc(C0.RUST, C0.CEMENT, 0.4, c), -2, PL + 3.95, 5.2, 5.6, 0.14, 3.9, 0, 0.1, 0.03);
+    cbox(-2, 5.2, 2.6, 1.8, PL + 4.0);
 
     cg.add(bake(mm, W.MAT.mason, 'castleMasonry'));
     cg.add(bake(mf, W.MAT.flat, 'castleBits'));
+
+    /* --- the way up: stone steps from the end of the causeway (deck 2.4 m)
+       to the gate on the plinth (4.7 m), over the rocks of the islet -------- */
+    {
+      const ax = -86 - 0.8 * 2, az = 10 + 0.6 * 2;        // the causeway's seaward end
+      const bx = cwx(0, -10.25), bz = cwz(0, -10.25);      // the plinth edge at the gate
+      const dx = bx - ax, dz = bz - az, len = Math.hypot(dx, dz), ang = Math.atan2(dx, dz);
+      const n = 8, sl = len / n, ms = new Mesher();
+      const stone = mixc(C0.LIMESTONE, C0.STONE_DARK, 0.25, new T.Color());
+      for (let k = 0; k < n; k++) {
+        const t = (k + 0.5) / n, top = 2.4 + (k + 1) * (4.7 - 2.4) / n;
+        const x = ax + dx * t, z = az + dz * t;
+        vary(stone, rng, 0.08, c);
+        ms.box(c, x, (top - 1.2) * 0.5, z, 3.6, top + 1.2, sl * 1.04, 0, ang + (rng() - 0.5) * 0.03, 0, 1 / 6);
+        collTurned(x, z, 1.8, sl * 0.5, ang, top, undefined, 1.2);
+      }
+      W.group.add(bake(ms, W.MAT.mason, 'castleSteps'));
+      landRect(ax + dx * 0.5, az + dz * 0.5, 2.0, len * 0.5, ang);
+    }
     const glow = bake(mg, W.MAT.glowOff, 'castleWindows');
     cg.add(glow);
     W.night.push(glow);
@@ -1410,6 +1623,8 @@
       mf.box(mixc(C0.PALM_GREEN, C0.NIGHT_TOP, 0.4, c), 0, 0.1, piers[i], 4.4, 1.0, 1.85);
     }
     g.add(bake(m, W.MAT.mason, 'causeway'));
+    // the deck and its run-out are land as far as tiling goes
+    landRect(-86 + 0.8 * 11.2, 10 - 0.6 * 11.2, WID * 0.5 + 0.4, 13.4, g.rotation.y);
     const bits = bake(mf, W.MAT.flat, 'causewayStain');
     if (bits) g.add(bits);
     W.group.add(g);
@@ -2842,7 +3057,7 @@
     const group = new T.Group();
     group.name = 'world';
     W = {
-      COL: COL, group: group, mats: [], geos: [], coll: [], night: [],
+      COL: COL, group: group, mats: [], geos: [], coll: [], land: [], night: [],
       palms: [], floaters: [], perches: [], gulls: [], ridges: [],
       sky: null, flag: null, flagBase: null, uncle: null, cat: null,
       catPost: null, smoke: null, gullMesh: null, cart: null
@@ -2856,6 +3071,10 @@
     buildCorniche();
     buildBalustrade();
     W.group.add(buildSaidaOffshore());     // Ziri, the harbour mole and its beacon
+    // Ziri and its jetty, as land for tiling (as the game already refused it)
+    landRect(ZIRI.x, (ZIRI.jetty.z1 + ZIRI.z + ZIRI.hz) * 0.5, ZIRI.hx, (ZIRI.z + ZIRI.hz - ZIRI.jetty.z1) * 0.5, 0);
+    landRect((ZIRI.jetty.x1 + ZIRI.jetty.x2) * 0.5, (ZIRI.jetty.z1 + ZIRI.jetty.z2) * 0.5,
+      (ZIRI.jetty.x2 - ZIRI.jetty.x1) * 0.5, (ZIRI.jetty.z2 - ZIRI.jetty.z1) * 0.5, 0);
     buildCastle();
     buildCauseway();
     buildTrees();
@@ -3115,6 +3334,10 @@
       ziri: { x: ZIRI.x, z: ZIRI.z, top: ZIRI.top,
               x1: ZIRI.x - ZIRI.hx, x2: ZIRI.x + ZIRI.hx, z1: ZIRI.jetty.z1, z2: ZIRI.z + ZIRI.hz },
       ferry: FERRY,
+      // ground the sea already has (the castle islet, the causeway, Ziri):
+      // no tiling over it, and tiles next to it rest against it
+      isLandAt: isLandAt,
+      castleTop: W.castleTop || null,
       setLightsEnabled: function (on) { lights.visible = !!on; }
     };
     setTimeOfDay(0.18);

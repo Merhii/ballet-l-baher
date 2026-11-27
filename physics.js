@@ -581,6 +581,21 @@
     const expSlot = new Int32Array(CELLS).fill(-1);
     const expKeys = [];
 
+    // Cells that are already land (the castle islet, the causeway, Ziri): never
+    // tiled, but a tile beside one rests against it the way row 0 rests
+    // against the shore, and that side of it is not open sea.
+    // opts.isLand(x, z) answers for a cell centre.
+    const land = new Uint8Array(CELLS);
+    if (typeof opts.isLand === 'function') {
+      for (let j = J_MIN; j <= J_MAX; j++) {
+        for (let i = I_MIN; i <= I_MAX; i++) {
+          if (opts.isLand(i * CELL, Z0 + j * CELL)) land[j * GRID_W + (i - I_MIN)] = 1;
+        }
+      }
+    }
+    // a tile, or land, holds this side
+    function held(key) { return tier[key] >= 0 || land[key] === 1; }
+
     const destroyed = [];        // reused: cleared, not reallocated, each update
     const scratch = { i: 0, j: 0, tier: 0, hp: 0, maxHp: 0, placedAt: 0 };
     let maxJ = -1;
@@ -609,10 +624,10 @@
     function missingCount(key, j) {
       const i = key - j * GRID_W + I_MIN;
       let m = 0;
-      if (i <= I_MIN || tier[key - 1] < 0) m++;                 // west
-      if (i >= I_MAX || tier[key + 1] < 0) m++;                 // east
-      if (j > 0 && tier[key - GRID_W] < 0) m++;                 // shoreward
-      if (j >= J_MAX || tier[key + GRID_W] < 0) m++;            // seaward
+      if (i <= I_MIN || !held(key - 1)) m++;                    // west
+      if (i >= I_MAX || !held(key + 1)) m++;                    // east
+      if (j > 0 && !held(key - GRID_W)) m++;                    // shoreward
+      if (j >= J_MAX || !held(key + GRID_W)) m++;               // seaward
       return m;
     }
 
@@ -635,10 +650,10 @@
       if (!inRange(i, j)) return false;
       if (j === J_MIN) return true;                              // against the shore
       const key = keyOf(i, j);
-      if (i > I_MIN && tier[key - 1] >= 0) return true;
-      if (i < I_MAX && tier[key + 1] >= 0) return true;
-      if (tier[key - GRID_W] >= 0) return true;
-      if (j < J_MAX && tier[key + GRID_W] >= 0) return true;
+      if (i > I_MIN && held(key - 1)) return true;
+      if (i < I_MAX && held(key + 1)) return true;
+      if (held(key - GRID_W)) return true;
+      if (j < J_MAX && held(key + GRID_W)) return true;
       return false;
     }
 
@@ -666,8 +681,10 @@
     }
 
     function canPlace(i, j) {
-      return inRange(i, j) && tier[keyOf(i, j)] < 0 && !blockedByNoBuild(i, j) && isSupported(i, j);
+      return inRange(i, j) && tier[keyOf(i, j)] < 0 && land[keyOf(i, j)] === 0 &&
+        !blockedByNoBuild(i, j) && isSupported(i, j);
     }
+    function isLand(i, j) { return inRange(i, j) && land[keyOf(i, j)] === 1; }
 
     // --- mutation ------------------------------------------------------------
     function place(i, j, tierIdx, t) {
@@ -849,6 +866,7 @@
       get: get,
       isSupported: isSupported,
       canPlace: canPlace,
+      isLand: isLand,
       exposure: exposure,
       update: update,
       solidAt: solidAt,

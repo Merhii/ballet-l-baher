@@ -1605,6 +1605,10 @@
           '<p>The island off the corniche. Abou Ali waits with his boat at the foot of the Souk el Akel ' +
           'stairs and takes you out for 10 lira; Turyaki brings you back for free. Or swim, if you ' +
           'have the stamina.</p>' +
+          '<h4>Qal3at el Ba7r</h4>' +
+          '<p>Walk the causeway out to the sea castle. The gate is open: a stair in the courtyard ' +
+          'takes you up onto the walls, and the domed keep has a stair inside all the way to the roof ' +
+          'and the flag. The castle rock counts as shore, so you can tile out from it.</p>' +
           '<h4>El Muallim\'s kiosk</h4>' +
           '<p>El Muallim stands by the kiosk on the corniche. Press ' + K('E') + ' beside him for ' +
           'upgrades: a bigger wheelbarrow (more mouna per trip), a better shovel, a stronger back ' +
