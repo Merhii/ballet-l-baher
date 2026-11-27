@@ -1535,7 +1535,7 @@
           '<nav class="blb-mnav">' +
             MB('continue', '01', 'Kammel', 'continue your stretch of sea', 'كمّل', 'primary') +
             MB('resume', '01', 'Resume', 'back to the balat', 'رجوع', 'primary') +
-            MB('new', '02', 'Balle4 men jdid', 'new game — a fresh, untiled sea', 'جديد') +
+            MB('new', '02', 'Ballesh men jdeed', 'new game — a fresh, untiled sea', 'جديد') +
             MB('howto', '03', 'Kif bteshtghel', 'how to play', 'كيف') +
             MB('settings', '04', 'E3dadat', 'settings', 'إعدادات') +
             MB('ach', '05', 'Achievements', 'what you have done so far', 'إنجازات') +
@@ -1784,9 +1784,9 @@
       // pause menu it reads as "start over".
       const nb = menuBtns['new'];
       nb.hidden = m === 'pause' ? false : !menuState.hasSave;
-      nb.querySelector('.l').firstChild.textContent = m === 'pause' ? 'Start over' : 'Balle4 men jdid';
+      nb.querySelector('.l').firstChild.textContent = m === 'pause' ? 'Start over' : 'Ballesh men jdeed';
       nb.querySelector('.s').textContent = m === 'pause'
-        ? 'balle4 men jdid — a fresh, untiled sea' : 'new game — a fresh, untiled sea';
+        ? 'ballesh men jdeed — a fresh, untiled sea' : 'new game — a fresh, untiled sea';
       const s = menuState.summary;
       let cells = '';
       if (s && (s.tiles || s.lira || s.laid)) {
